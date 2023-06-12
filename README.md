@@ -5,6 +5,13 @@ Provides various compatibility functions required for PHP (temporary) migration.
 > **WARNING**
 > This extension is intended for temporary use only. In other words, code in the production environment should not rely on this implementation as much as possible, and should be gradually phased out when it is safe to do so.
 
+## Supported Versions
+
+- Extension: PHP >= 8.0, 8.2 > PHP
+- Library: PHP >= 7.4, 8.2 > PHP
+
+Library is introduced for migration to PHP 8.x with the same code base. If you do not need to work with the same code base, you can use only the Extension.
+
 ## Usage
 
 ### Install

@@ -46,9 +46,13 @@ final class ArrayFuncToBCMigrateRector extends AbstractRector
             return \null;
         }
 
-        return match (\true) {
-            $nodeName === 'in_array', $nodeName === 'array_search', $nodeName === 'array_keys' => new FuncCall(new Name($this->getBCFunctionFQN74($nodeName)), $node->args),
-            default => \null,
-        };
+        switch (\true) {
+            case $nodeName === 'in_array':
+            case $nodeName === 'array_search':
+            case $nodeName === 'array_keys':
+                return  new FuncCall(new Name($this->getBCFunctionFQN74($nodeName)), $node->args);
+            default:
+                return \null;
+        }
     }
 }

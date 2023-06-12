@@ -46,9 +46,19 @@ final class RandomToBCMigrateRector extends AbstractRector
             return \null;
         }
 
-        return match (\true) {
-            $nodeName === 'srand', $nodeName === 'rand', $nodeName === 'getrandmax', $nodeName === 'shuffle', $nodeName === 'str_shuffle', $nodeName === 'array_rand', $nodeName === 'mt_srand', $nodeName === 'mt_rand', $nodeName === 'mt_getrandmax' => new FuncCall(new Name($this->getBCFunctionFQN70($nodeName)), $node->args),
-            default => \null,
+        switch (\true) {
+            case $nodeName === 'srand':
+            case $nodeName === 'rand':
+            case $nodeName === 'getrandmax':
+            case $nodeName === 'shuffle':
+            case $nodeName === 'str_shuffle':
+            case $nodeName === 'array_rand':
+            case $nodeName === 'mt_srand':
+            case $nodeName === 'mt_rand':
+            case $nodeName === 'mt_getrandmax':
+                return new FuncCall(new Name($this->getBCFunctionFQN70($nodeName)), $node->args);
+            default:
+                return \null;
         };
     }
 }

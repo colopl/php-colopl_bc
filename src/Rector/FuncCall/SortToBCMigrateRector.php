@@ -46,9 +46,19 @@ final class SortToBCMigrateRector extends AbstractRector
             return \null;
         }
 
-        return match (\true) {
-            $nodeName === 'ksort', $nodeName === 'krsort', $nodeName === 'asort', $nodeName === 'arsort', $nodeName === 'sort', $nodeName === 'rsort', $nodeName === 'usort', $nodeName === 'uasort', $nodeName === 'uksort' => new FuncCall(new Name($this->getBCFunctionFQN74($nodeName)), $node->args),
-            default => \null,
-        };
+        switch (\true) {
+            case $nodeName === 'ksort':
+            case $nodeName === 'krsort':
+            case $nodeName === 'asort':
+            case $nodeName === 'arsort':
+            case $nodeName === 'sort':
+            case $nodeName === 'rsort':
+            case $nodeName === 'usort':
+            case $nodeName === 'uasort':
+            case $nodeName === 'uksort':
+                return new FuncCall(new Name($this->getBCFunctionFQN74($nodeName)), $node->args);
+            default:
+                return \null;
+        }
     }
 }

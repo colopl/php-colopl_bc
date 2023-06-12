@@ -1,0 +1,40 @@
+name: Build
+on:
+  push:
+    tags:
+      - '[0-9]+.[0-9]+.[0-9]+'
+jobs:
+  ubuntu_2204_php81_origin_deb:
+    runs-on: ubuntu-22.04
+    timeout-minutes: 60
+    strategy:
+      matrix:
+        arch: ["arm64v8", "amd64"]
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3
+      - name: Setup QEMU
+        uses: docker/setup-qemu-action@v2
+        with:
+          platforms: arm64
+      - name: Setup buildx
+        uses: docker/setup-buildx-action@v2
+      - name: Build container
+        uses: docker/build-push-action@v4
+        with:
+          build-args: ARCH=${{ matrix.arch }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+          context: .
+          file: ./build/ubuntu2204/Dockerfile
+          load: true
+          tags: "pskel-build-ubuntu2204-${{ matrix.arch }}"
+      - name: Build extension with container
+        run: |
+          mkdir "artifacts"
+          docker run --env VERSION="${{ github.ref_name }}" --rm -v"$(pwd)/artifacts:/tmp/artifacts" -i "pskel-build-ubuntu2204-${{ matrix.arch }}"
+      - name: Upload deb packages
+        uses: actions/upload-artifact@v3
+        with:
+          name: ubuntu_2204_debs
+          path: artifacts/

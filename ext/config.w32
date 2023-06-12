@@ -1,0 +1,5 @@
+ARG_ENABLE('colopl_bc', 'colopl_bc support', 'no');
+
+if (PHP_COLOPL_BC != 'no') {
+	EXTENSION('colopl_bc', 'colopl_bc_php70.c colopl_bc_php74.c colopl_bc.c', null, '/DZEND_ENABLE_STATIC_TSRMLS_CACHE=1');
+}

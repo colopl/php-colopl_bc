@@ -1,0 +1,150 @@
+--TEST--
+Check for \Colopl\ColoplBc\Php74\uksort() function. (colopl_bc.php74.compare_mode=3)
+--INI--
+error_log=
+colopl_bc.php74.compare_mode=3
+colopl_bc.php74.sort_mode=3
+--EXTENSIONS--
+colopl_bc
+--FILE--
+<?php
+$array = range(1, 64);
+\Colopl\ColoplBc\Php74\uksort($array, function (int $left, int $right): int {
+    return 0;
+});
+var_dump($array);
+?>
+--EXPECTF--
+Incompatible sort detected
+
+Deprecated: Colopl\ColoplBc\Php74\uksort(): Incompatible sort detected in %s on line %d
+array(64) {
+  [0]=>
+  int(1)
+  [48]=>
+  int(49)
+  [35]=>
+  int(36)
+  [36]=>
+  int(37)
+  [37]=>
+  int(38)
+  [38]=>
+  int(39)
+  [39]=>
+  int(40)
+  [40]=>
+  int(41)
+  [41]=>
+  int(42)
+  [42]=>
+  int(43)
+  [43]=>
+  int(44)
+  [44]=>
+  int(45)
+  [45]=>
+  int(46)
+  [46]=>
+  int(47)
+  [47]=>
+  int(48)
+  [49]=>
+  int(50)
+  [33]=>
+  int(34)
+  [50]=>
+  int(51)
+  [51]=>
+  int(52)
+  [52]=>
+  int(53)
+  [53]=>
+  int(54)
+  [54]=>
+  int(55)
+  [55]=>
+  int(56)
+  [56]=>
+  int(57)
+  [57]=>
+  int(58)
+  [58]=>
+  int(59)
+  [59]=>
+  int(60)
+  [60]=>
+  int(61)
+  [61]=>
+  int(62)
+  [62]=>
+  int(63)
+  [34]=>
+  int(35)
+  [32]=>
+  int(33)
+  [1]=>
+  int(2)
+  [15]=>
+  int(16)
+  [2]=>
+  int(3)
+  [3]=>
+  int(4)
+  [4]=>
+  int(5)
+  [5]=>
+  int(6)
+  [6]=>
+  int(7)
+  [7]=>
+  int(8)
+  [8]=>
+  int(9)
+  [9]=>
+  int(10)
+  [10]=>
+  int(11)
+  [11]=>
+  int(12)
+  [12]=>
+  int(13)
+  [13]=>
+  int(14)
+  [14]=>
+  int(15)
+  [16]=>
+  int(17)
+  [31]=>
+  int(32)
+  [17]=>
+  int(18)
+  [18]=>
+  int(19)
+  [19]=>
+  int(20)
+  [20]=>
+  int(21)
+  [21]=>
+  int(22)
+  [22]=>
+  int(23)
+  [23]=>
+  int(24)
+  [24]=>
+  int(25)
+  [25]=>
+  int(26)
+  [26]=>
+  int(27)
+  [27]=>
+  int(28)
+  [28]=>
+  int(29)
+  [29]=>
+  int(30)
+  [30]=>
+  int(31)
+  [63]=>
+  int(64)
+}

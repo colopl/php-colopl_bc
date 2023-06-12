@@ -1,0 +1,107 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<package packagerversion="1.10.13"
+         version="2.0"
+         xmlns="http://pear.php.net/dtd/package-2.0"
+         xmlns:tasks="http://pear.php.net/dtd/tasks-1.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://pear.php.net/dtd/tasks-1.0 http://pear.php.net/dtd/tasks-1.0.xsd http://pear.php.net/dtd/package-2.0 http://pear.php.net/dtd/package-2.0.xsd">
+    <name>colopl_bc</name>
+    <channel>pecl.php.net</channel>
+    <summary>colopl_bc - BC Extension</summary>
+    <description>Provides backwards compatibility for Legacy PHP versions.</description>
+        <lead>
+        <name>Go Kudo</name>
+        <user>g-kudo</user>
+        <email>g-kudo@colopl.co.jp</email>
+        <active>yes</active>
+    </lead>
+        <date>2023-06-12</date>
+    <time>04:48:58</time>
+    <version>
+        <release>10.0.0</release>
+        <api>10.0.0</api>
+    </version>
+    <stability>
+        <release>stable</release>
+        <api>stable</api>
+    </stability>
+    <license uri="http://www.php.net/license/3_01.txt">PHP License 3.01</license>
+    <notes>Release 10.0.0</notes>
+    <contents>
+        <dir baseinstalldir="/" name="/">
+            <file md5sum="d1848793757f858005697487e5e02ace" name="config.h" role="src" />
+            <file md5sum="61ae0a1ac10a7aaccfa75b8c90f9ef99" name="php_colopl_bc_php74.h" role="src" />
+            <file md5sum="f6d51c7ae64d205f5707a0467d658761" name="php_colopl_bc_php70.h" role="src" />
+            <file md5sum="e780c3df6d866a419d3452ecae883420" name="php_colopl_bc.h" role="src" />
+            <file md5sum="9eb36878045716f799506c9f2db89d61" name="colopl_bc_arginfo.h" role="src" />
+            <file md5sum="cf75a13f4d873909c94168728a4f7e27" name="colopl_bc.c" role="src" />
+            <file md5sum="9369b2c19cbfb45bb1d6c916223f0dcf" name="colopl_bc_php70.c" role="src" />
+            <file md5sum="e884ccdd609a22451b8321cf20a1f077" name="colopl_bc_php74.c" role="src" />
+            <file md5sum="2c43c3a9d792c266341b19f33836f633" name="tests/php74/sort_mode_change.phpt" role="test" />
+            <file md5sum="8654598c6468c1e43064db1616e0ed78" name="tests/php74/function/sort.phpt" role="test" />
+            <file md5sum="41cd6c0b4a3290b773a550a117a9638b" name="tests/php74/function/uksort.phpt" role="test" />
+            <file md5sum="a73b5a404769d77faf94bdff275dfd92" name="tests/php74/function/uasort.phpt" role="test" />
+            <file md5sum="317e7c0320c2b9023158462e03b0227d" name="tests/php74/function/arsort.phpt" role="test" />
+            <file md5sum="8d4fcd0798f4cea0135fbf4210d65095" name="tests/php74/function/krsort.phpt" role="test" />
+            <file md5sum="0145d2ed5625bb7cef9ba1e8e1448441" name="tests/php74/function/array_multisort.phpt" role="test" />
+            <file md5sum="ea4521e1a7e7363e97ae0e90d43ec03b" name="tests/php74/function/in_array.phpt" role="test" />
+            <file md5sum="a9cd7f365e361358d94857c0908465fd" name="tests/php74/function/asort.phpt" role="test" />
+            <file md5sum="bb76cf3f62b0e696cfbae9a2c48b61b7" name="tests/php74/function/ksort.phpt" role="test" />
+            <file md5sum="f57463cbf8a213f95172f8ba9ca78306" name="tests/php74/function/array_search.phpt" role="test" />
+            <file md5sum="ed62d5cbed9dde43c8a4a469c598f058" name="tests/php74/function/usort.phpt" role="test" />
+            <file md5sum="0bbda2664ed10c8ff6a78556dcb6b78d" name="tests/php74/function/ksort_php82later.phpt" role="test" />
+            <file md5sum="a702f6479e89a1b587b48766ae8c322d" name="tests/php74/function/array_keys.phpt" role="test" />
+            <file md5sum="98c46ccb559ba13f841909c2decdaa96" name="tests/php74/function/rsort.phpt" role="test" />
+            <file md5sum="b8401fff8be9209a21d1e0a5bf6ca87a" name="tests/php74/function/krsort_php82later.phpt" role="test" />
+            <file md5sum="57384b13c5aea5e616af8595ef31a902" name="tests/php74/binaryop/compare_005_64bit.phpt" role="test" />
+            <file md5sum="65921d81d4c9e42a70bd1b4646de5f0f" name="tests/php74/binaryop/compare_001.phpt" role="test" />
+            <file md5sum="991586e1462beb346c209cfb82c90e25" name="tests/php74/binaryop/compare_006.phpt" role="test" />
+            <file md5sum="a69fabf7af0d80f01e7ea81eded1e8ae" name="tests/php74/binaryop/compare_004.phpt" role="test" />
+            <file md5sum="7c298b9bc96f68de30868088a4fca540" name="tests/php74/binaryop/compare_001_64bit.phpt" role="test" />
+            <file md5sum="59cfdde28fe6ebb8ae5820e8265c9b7a" name="tests/php74/binaryop/compare_005.phpt" role="test" />
+            <file md5sum="f2bee1b22acde23615d91d0f038c257e" name="tests/php74/binaryop/compare_004_64bit.phpt" role="test" />
+            <file md5sum="71be16dadf8666197280239e973245b7" name="tests/php74/binaryop/compare_003_64bit.phpt" role="test" />
+            <file md5sum="56a10a812de2c8d2cccb304ba3d6ab87" name="tests/php74/binaryop/compare_003.phpt" role="test" />
+            <file md5sum="c1a92b3d1035cb783c02bd7c6c776341" name="tests/php74/binaryop/compare_006_64bit.phpt" role="test" />
+            <file md5sum="b4beccc3da216c105937059cf79a474e" name="tests/php74/compare_mode_change.phpt" role="test" />
+            <file md5sum="1376d1311693847245a5430e01082c45" name="tests/reflection.phpt" role="test" />
+            <file md5sum="ef54fe376764ab5a67d201633acbbb6c" name="tests/availability.phpt" role="test" />
+            <file md5sum="9b606262ba26afd7d1db40b767ba26e8" name="tests/php70/mt_rand_compatibility.phpt" role="test" />
+            <file md5sum="5d6e6dac4f7242cebd9f916506a0ca78" name="tests/php70/mt_rand_atomic.phpt" role="test" />
+            <file md5sum="be6014b0dd93d0693a4f06de9ec09c2b" name="tests/php70/date_create.phpt" role="test" />
+            <file md5sum="8b8ea2dde127d9274c3d60bfd8bbeaeb" name="tests/php70/rand_atomic.phpt" role="test" />
+            <file md5sum="630ce631c0b7b98c685f61c9605ca478" name="tests/php70/undefined_behavior_compatibility.phpt" role="test" />
+            <file md5sum="1f980fae1d0fe72e49ff4ed34e7cffaf" name="tests/php70/date_create_immutable.phpt" role="test" />
+            <file md5sum="699bf1bb7ad29ff5044e99e97f3c2802" name="tests/php70/rand_incompatibility.phpt" role="test" />
+            <file md5sum="acd17758bc50730efaa244b9822aa711" name="tests/php70/mt_rand_incompatibility.phpt" role="test" />
+            <file md5sum="ac374ab0b2dacb4050f8684007dda7db" name="tests/php70/rand_compatibility.phpt" role="test" />
+        </dir>
+    </contents>
+    <dependencies>
+        <required>
+            <php>
+                <min>8.0.0</min>
+            </php>
+            <pearinstaller>
+                <min>1.10.13</min>
+            </pearinstaller>
+        </required>
+    </dependencies>
+    <providesextension>colopl_bc</providesextension>
+    <extsrcrelease />
+    <changelog>
+        <release>
+            <date>2023-06-12</date>
+            <version>
+                <release>10.0.0</release>
+                <api>10.0.0</api>
+            </version>
+            <stability>
+                <release>stable</release>
+                <api>stable</api>
+            </stability>
+            <license uri="http://www.php.net/license/3_01.txt">PHP License 3.01</license>
+            <notes>Release 10.0.0</notes>
+        </release>
+    </changelog>
+</package>

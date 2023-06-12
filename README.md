@@ -111,36 +111,36 @@ Please check the settings of the corresponding ini directives.
 
 ### Functions
 
-- `Colopl\Colopl\Php74\ksort()`
-- `Colopl\Colopl\Php74\krsort()`
-- `Colopl\Colopl\Php74\asort()`
-- `Colopl\Colopl\Php74\arsort()`
-- `Colopl\Colopl\Php74\sort()`
-- `Colopl\Colopl\Php74\rsort()`
-- `Colopl\Colopl\Php74\usort()`
-- `Colopl\Colopl\Php74\uasort()`
-- `Colopl\Colopl\Php74\uksort()`
-- `Colopl\Colopl\Php74\array_multisort()`
+- `Colopl\ColoplBc\Php74\ksort()`
+- `Colopl\ColoplBc\Php74\krsort()`
+- `Colopl\ColoplBc\Php74\asort()`
+- `Colopl\ColoplBc\Php74\arsort()`
+- `Colopl\ColoplBc\Php74\sort()`
+- `Colopl\ColoplBc\Php74\rsort()`
+- `Colopl\ColoplBc\Php74\usort()`
+- `Colopl\ColoplBc\Php74\uasort()`
+- `Colopl\ColoplBc\Php74\uksort()`
+- `Colopl\ColoplBc\Php74\array_multisort()`
 
 Sorting is performed using the previous unstable sorting algorithm.
 
 These compatibilities can also be checked at runtime. See the `colopl_bc.php74.sort_mode` INI directive for details.
 
-- `Colopl\Colopl\Php74\in_array()`
-- `Colopl\Colopl\Php74\array_search()`
-- `Colopl\Colopl\Php74\array_keys()`
+- `Colopl\ColoplBc\Php74\in_array()`
+- `Colopl\ColoplBc\Php74\array_search()`
+- `Colopl\ColoplBc\Php74\array_keys()`
 
 These functions use older comparison algorithms than PHP 8.0 for their internal use.
 
 These compatibilities can also be checked at runtime. See the `colopl_bc.php74.compare_mode` INI directive for details.
 
-- `Colopl\Colopl\Php74\eq()` (`==`)
-- `Colopl\Colopl\Php74\neq()` (`!=`)
-- `Colopl\Colopl\Php74\lt()` (`<`)
-- `Colopl\Colopl\Php74\lte()` (`<=`)
-- `Colopl\Colopl\Php74\gt()` (`>`)
-- `Colopl\Colopl\Php74\gte()` (`>=`)
-- `Colopl\Colopl\Php74\spaceship()` (`<=>`)
+- `Colopl\ColoplBc\Php74\eq()` (`==`)
+- `Colopl\ColoplBc\Php74\neq()` (`!=`)
+- `Colopl\ColoplBc\Php74\lt()` (`<`)
+- `Colopl\ColoplBc\Php74\lte()` (`<=`)
+- `Colopl\ColoplBc\Php74\gt()` (`>`)
+- `Colopl\ColoplBc\Php74\gte()` (`>=`)
+- `Colopl\ColoplBc\Php74\spaceship()` (`<=>`)
 
 For the corresponding comparison operator, returns results that reproduce the older behavior.
 

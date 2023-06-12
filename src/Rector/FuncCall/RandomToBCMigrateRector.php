@@ -59,6 +59,6 @@ final class RandomToBCMigrateRector extends AbstractRector
                 return new FuncCall(new Name($this->getBCFunctionFQN70($nodeName)), $node->args);
             default:
                 return \null;
-        };
+        }
     }
 }

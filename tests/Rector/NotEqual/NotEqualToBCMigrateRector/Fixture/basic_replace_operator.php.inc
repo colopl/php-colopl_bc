@@ -1,6 +1,6 @@
 <?php
 
-namespace Colopl\Rector\Tests\Php80\Rector\NotEqual\NotEqualToBCMigrateRector\Fixture;
+namespace Colopl\ColoplBc\Tests\Rector\NotEqual\NotEqualToBCMigrateRector\Fixture;
 
 0 != '';
 0 !== '';
@@ -9,7 +9,7 @@ namespace Colopl\Rector\Tests\Php80\Rector\NotEqual\NotEqualToBCMigrateRector\Fi
 -----
 <?php
 
-namespace Colopl\Rector\Tests\Php80\Rector\NotEqual\NotEqualToBCMigrateRector\Fixture;
+namespace Colopl\ColoplBc\Tests\Rector\NotEqual\NotEqualToBCMigrateRector\Fixture;
 
 \Colopl\ColoplBc\Php74\neq(0, '');
 0 !== '';

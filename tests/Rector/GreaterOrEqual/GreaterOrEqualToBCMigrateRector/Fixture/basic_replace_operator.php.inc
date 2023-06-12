@@ -1,6 +1,6 @@
 <?php
 
-namespace Colopl\Rector\Tests\Php80\Rector\GreaterOrEqual\GreaterOrEqualToBCMigrateRector\Fixture;
+namespace Colopl\ColoplBc\Tests\Rector\GreaterOrEqual\GreaterOrEqualToBCMigrateRector\Fixture;
 
 0 > '';
 0 >= '';
@@ -9,7 +9,7 @@ namespace Colopl\Rector\Tests\Php80\Rector\GreaterOrEqual\GreaterOrEqualToBCMigr
 -----
 <?php
 
-namespace Colopl\Rector\Tests\Php80\Rector\GreaterOrEqual\GreaterOrEqualToBCMigrateRector\Fixture;
+namespace Colopl\ColoplBc\Tests\Rector\GreaterOrEqual\GreaterOrEqualToBCMigrateRector\Fixture;
 
 0 > '';
 \Colopl\ColoplBc\Php74\gte(0, '');

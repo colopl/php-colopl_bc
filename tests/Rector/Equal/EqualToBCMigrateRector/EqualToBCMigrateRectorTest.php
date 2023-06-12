@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace Colopl\Rector\Tests\Php80\Rector\Equal\EqualToBCMigrateRector;
+namespace Colopl\ColoplBc\Tests\Rector\Equal\EqualToBCMigrateRector;
 
 use Colopl\ColoplBc\Tests\Rector\AbstractSimpleRectorTestCase;
 

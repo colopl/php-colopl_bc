@@ -55,7 +55,7 @@ switch (true) {
         return 1;
         break;
     case $input == Lexer::T_BAR:
-        return 1;
+        return 2;
         break;
 }
 CODE_SAMPLE

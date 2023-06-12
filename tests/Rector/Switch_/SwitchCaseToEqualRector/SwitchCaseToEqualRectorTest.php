@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace Colopl\Rector\Tests\Php80\Rector\Switch_\SwitchCaseToEqualRector;
+namespace Colopl\ColoplBc\Tests\Rector\Switch_\SwitchCaseToEqualRector;
 
 use Colopl\ColoplBc\Tests\Rector\AbstractSimpleRectorTestCase;
 

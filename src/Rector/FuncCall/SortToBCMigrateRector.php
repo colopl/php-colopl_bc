@@ -24,7 +24,7 @@ final class SortToBCMigrateRector extends AbstractRector
     public function getRuleDefinition(): RuleDefinition
     {
         return new RuleDefinition(
-            'Migrate incompatible PHP sort unctions to colopl_bc functions.',
+            'Migrate incompatible PHP sort functions to colopl_bc functions.',
             [new CodeSample('$arr = range(1, 10); sort($arr);', '$arr = range(1, 10); \\Colopl\\BackwardsCompatibility\\Php74\\sort($arr);')]
         );
     }

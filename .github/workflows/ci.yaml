@@ -40,7 +40,7 @@ jobs:
     timeout-minutes: 60
     strategy:
       matrix:
-        arch: ["amd64", "arm64v8"]
+        arch: ["amd64", "arm64v8", "s390x"]
         version: ["8.0", "8.1"]
         type: ["cli", "zts"]
         distro: ["bullseye", "alpine"]

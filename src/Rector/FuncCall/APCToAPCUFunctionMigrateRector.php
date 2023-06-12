@@ -61,7 +61,7 @@ final class APCToAPCUFunctionMigrateRector extends AbstractRector
                 return new FuncCall(new Name($this->replaceAPCUFunctionName($nodeName)), $node->args);
             case $nodeName === 'apc_cache_info':
                 /* Migratable operations, argument must be "user" */
-                $args = $node->args;
+                $args = $node->getArgs();
                 if (\count($args) > 0) {
                     $expr = $args[0]->value;
                     /* Check first argument has "user" */

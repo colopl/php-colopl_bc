@@ -35,15 +35,13 @@ final class NewAPCIteratorToAPCUIteratorRector extends AbstractRector
 
     public function refactor(Node $node): ?New_
     {
-        /** @var New_ $node */
+        \assert($node instanceof New_);
         if (!$node->class instanceof Name || !$this->isName($node->class, 'APCIterator')) {
             return \null;
         }
 
-        /*
-         * 第一引数はいらないので消す
-         */
         $args = $node->args;
+        /* Remove unneeded argument */
         \array_shift($args);
 
         return new New_(new Name\FullyQualified('APCUIterator'), $args);

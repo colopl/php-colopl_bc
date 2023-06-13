@@ -1,6 +1,6 @@
 <?php
 
-namespace Colopl\Rector\Tests\Php80\Rector\Switch_\SwitchCaseToEqualRector\SwitchCaseToEqualRector\Fixture;
+namespace Colopl\ColoplBc\Tests\Rector\Switch_\SwitchCaseToEqualRector\SwitchCaseToEqualRector\Fixture;
 
 $foo = '0';
 
@@ -48,7 +48,7 @@ switch (true) {
 -----
 <?php
 
-namespace Colopl\Rector\Tests\Php80\Rector\Switch_\SwitchCaseToEqualRector\SwitchCaseToEqualRector\Fixture;
+namespace Colopl\ColoplBc\Tests\Rector\Switch_\SwitchCaseToEqualRector\SwitchCaseToEqualRector\Fixture;
 
 $foo = '0';
 

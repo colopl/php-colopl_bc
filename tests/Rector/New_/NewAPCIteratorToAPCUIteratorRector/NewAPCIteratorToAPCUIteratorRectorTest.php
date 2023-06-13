@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace Colopl\Rector\Tests\Php80\Rector\New_\NewAPCIteratorToAPCUIteratorRector;
+namespace Colopl\ColoplBc\Tests\Rector\New_\NewAPCIteratorToAPCUIteratorRector;
 
 use Colopl\ColoplBc\Tests\Rector\AbstractSimpleRectorTestCase;
 

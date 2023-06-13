@@ -46,19 +46,19 @@ final class ArrayKeyExistsToPropertyExistsRector extends AbstractRector
 
         $args = $node->getArgs();
         if (!\array_key_exists(1, $args)) {
-            /* 引数が不完全なので対応しない */
+            /* Not perform it. */
             return \null;
         }
 
         $type = $this->getType($args[1]->value);
 
         if ($type->isArray()->yes()) {
-            /* 配列なら array_key_exists のままで良い */
+            /* If it's array, Not perform it. */
             return \null;
         }
 
         if (!$type->isObject()->yes()) {
-            /* 明確にオブジェクトでなければ変換しない */
+            /* If it's not clearly an object, Not perform it. */
             return \null;
         }
 

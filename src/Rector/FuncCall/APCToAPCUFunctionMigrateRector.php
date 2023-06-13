@@ -7,6 +7,7 @@ namespace Colopl\ColoplBc\Rector\FuncCall;
 use PhpParser\Node;
 use PhpParser\Node\Expr\FuncCall;
 use PhpParser\Node\Name;
+use PhpParser\Node\Scalar\String_;
 use Rector\Core\Rector\AbstractRector;
 use Symplify\RuleDocGenerator\Exception\PoorDocumentationException;
 use Symplify\RuleDocGenerator\ValueObject\CodeSample\CodeSample;
@@ -47,7 +48,7 @@ final class APCToAPCUFunctionMigrateRector extends AbstractRector
          * @see https://github.com/krakjoe/apcu/blob/master/php_apc.stub.php
          */
         switch (\true) {
-            /* 単純置換対応 */
+            /* Simply replacement */
             case $nodeName === 'apc_sma_info':
             case $nodeName === 'apc_store':
             case $nodeName === 'apc_fetch':
@@ -59,19 +60,24 @@ final class APCToAPCUFunctionMigrateRector extends AbstractRector
             case $nodeName === 'apc_cas':
                 return new FuncCall(new Name($this->replaceAPCUFunctionName($nodeName)), $node->args);
             case $nodeName === 'apc_cache_info':
-                /* "user" 以外は対応できない (そもそもそれはもう OPcache がやってる) が
-                 * 少なくともコロプラでは必要ないので単に第一引数を無視する */
-                $args = $node->args;
+                /* Migratable operations, argument must be "user" */
+                $args = $node->getArgs();
                 if (\count($args) > 0) {
+                    $expr = $args[0]->value;
+                    /* Check first argument has "user" */
+                    if ($expr instanceof String_) {
+                        if (\strtolower($expr->value) !== 'user') {
+                            return \null;
+                        }
+                    }
                     \array_shift($args);
                 }
                 return new FuncCall(new Name($this->replaceAPCUFunctionName($nodeName)), $args);
             case $nodeName === 'apc_clear_cache':
-                /* "user" 引数以外は対応できない (そもそもそれはもう OPcache がやってる) が
-                 * 少なくともコロプラでは必要ないので単に引数をなくす */
+                /* Remove unneeded argument */
                 return new FuncCall(new Name($this->replaceAPCUFunctionName($nodeName)));
             default:
-                /* これ以外は別の関数 or APC 固有の機能なので非対応 */
+                /* Not supported */
                 return \null;
         }
     }

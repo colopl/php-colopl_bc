@@ -1,6 +1,6 @@
 <?php
 
-namespace Colopl\Rector\Tests\Php80\Rector\Smaller\SmallerToBCMigrateRector\Fixture;
+namespace Colopl\ColoplBc\Tests\Rector\Smaller\SmallerToBCMigrateRector\Fixture;
 
 0 < '';
 0 <= '';
@@ -9,7 +9,7 @@ namespace Colopl\Rector\Tests\Php80\Rector\Smaller\SmallerToBCMigrateRector\Fixt
 -----
 <?php
 
-namespace Colopl\Rector\Tests\Php80\Rector\Smaller\SmallerToBCMigrateRector\Fixture;
+namespace Colopl\ColoplBc\Tests\Rector\Smaller\SmallerToBCMigrateRector\Fixture;
 
 \Colopl\ColoplBc\Php74\lt(0, '');
 0 <= '';

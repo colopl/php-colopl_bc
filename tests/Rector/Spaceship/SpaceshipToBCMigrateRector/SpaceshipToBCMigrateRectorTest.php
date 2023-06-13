@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace Colopl\Rector\Tests\Php80\Rector\Spaceship\SpaceshipToBCMigrateRector;
+namespace Colopl\ColoplBc\Tests\Rector\Spaceship\SpaceshipToBCMigrateRector;
 
 use Colopl\ColoplBc\Tests\Rector\AbstractSimpleRectorTestCase;
 

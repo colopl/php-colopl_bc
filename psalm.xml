@@ -9,7 +9,6 @@
         xsi:schemaLocation="https://getpsalm.org/schema/config vendor/vimeo/psalm/config.xsd"
 >
     <projectFiles>
-        <file name="ext/package.xml.php"/>
         <file name="library.php"/>
         <directory name="src"/>
         <directory name="tests"/>

@@ -2,39 +2,36 @@ name: CI
 on: [push, pull_request]
 jobs:
   Library:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-22.04
     timeout-minutes: 60
+    strategy:
+      matrix:
+        version: ["7.4", "8.0", "8.1", "8.2"]
     steps:
       - name: Checkout
         uses: actions/checkout@v3
-      - name: Install Extension
-        run: |
-          cd ext/
-          phpize
-          ./configure
-          make -j$(nproc)
-          make test
-          sudo make install
-          echo "extension=colopl_bc" | sudo tee "$(php-config --ini-dir)/10-colopl_bc.ini"
-          php --re "colopl_bc"
-      - name: Get Composer Cache Directory
-        id: composer-cache
-        run: |
-          echo "dir=$(composer config cache-files-dir)" >> $GITHUB_OUTPUT
-      - uses: actions/cache@v3
+      - name: Setup Buildx
+        uses: docker/setup-buildx-action@v2
+      - name: Cache
+        uses: actions/cache@v3
         with:
-          path: ${{ steps.composer-cache.outputs.dir }}
-          key: ${{ runner.os }}-composer-${{ hashFiles('composer.lock') }}
-          restore-keys: |
-            ${{ runner.os }}-composer-
-      - name: Composer Install
-        run: composer install --prefer-dist
+          path: ./vendor
+          key: library-composer-${{ hashFiles('composer.lock') }}
+          restore-keys: library-composer-${{ hashFiles('composer.lock') }}
+      - name: Build Container
+        uses: docker/build-push-action@v4
+        with:
+          build-args: |
+            IMAGE=php
+            TAG=${{ matrix.version }}-cli
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+          context: .
+          file: ./build/library/Dockerfile
+          load: true
+          tags: "library-docker-${{ matrix.version }}"
       - name: Test Library
-        run: composer exec -- phpunit --config="phpunit.xml"
-      - name: Analyse PHPStan
-        run: composer exec -- phpstan analyse --memory-limit=-1 --configuration="phpstan.neon"
-      - name: Analyse Psalm
-        run: composer exec -- psalm --memory-limit=-1 --config="psalm.xml"
+        run: docker run --rm -v"$(pwd):/workspace:cached" -i library-docker-${{ matrix.version }}
   Extension:
     runs-on: ubuntu-22.04
     timeout-minutes: 60
@@ -51,7 +48,7 @@ jobs:
           uses: docker/setup-qemu-action@v2
           with:
             platforms: "arm64,s390x"
-        - name: Setup buildx
+        - name: Setup Buildx
           uses: docker/setup-buildx-action@v2
         - name: Build Container
           uses: docker/build-push-action@v4

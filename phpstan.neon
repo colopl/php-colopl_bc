@@ -4,7 +4,6 @@ parameters:
     level: max
     paths:
         - library.php
-        - ext/package.xml.php
         - src/
         - tests/
     parallel:

@@ -17,9 +17,9 @@ jobs:
         uses: docker/setup-qemu-action@v2
         with:
           platforms: arm64
-      - name: Setup buildx
+      - name: Setup Buildx
         uses: docker/setup-buildx-action@v2
-      - name: Build container
+      - name: Build Container
         uses: docker/build-push-action@v4
         with:
           build-args: ARCH=${{ matrix.arch }}
@@ -29,11 +29,11 @@ jobs:
           file: ./build/ubuntu2204/Dockerfile
           load: true
           tags: "pskel-build-ubuntu2204-${{ matrix.arch }}"
-      - name: Build extension with container
+      - name: Build Extension with Container
         run: |
           mkdir "artifacts"
           docker run --env VERSION="${{ github.ref_name }}" --rm -v"$(pwd)/artifacts:/tmp/artifacts" -i "pskel-build-ubuntu2204-${{ matrix.arch }}"
-      - name: Upload deb packages
+      - name: Upload deb Packages
         uses: actions/upload-artifact@v3
         with:
           name: ubuntu_2204_debs

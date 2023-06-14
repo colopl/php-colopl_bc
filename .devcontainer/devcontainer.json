@@ -3,7 +3,7 @@
 	"build": {
 		"args": {
 			"IMAGE": "php",
-			"TAG": "8.1-cli"
+			"TAG": "8.2-cli"
 		}
 	},
 	"customizations": {

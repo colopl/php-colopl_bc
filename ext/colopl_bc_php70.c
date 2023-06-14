@@ -246,6 +246,7 @@ PHP_FUNCTION(Colopl_ColoplBc_Php70_mt_getrandmax)
 
 /* array.c */
 
+#if PHP_VERSION_ID < 80200
 PHPAPI void php_colopl_bc_array_data_shuffle(zval *array)
 {
 	uint32_t idx, j, n_elems;
@@ -329,6 +330,90 @@ PHPAPI void php_colopl_bc_array_data_shuffle(zval *array)
 	}
 	HANDLE_UNBLOCK_INTERRUPTIONS();
 }
+#else
+PHPAPI void php_colopl_bc_array_data_shuffle(zval *array)
+{
+	int64_t idx, j, n_elems, rnd_idx, n_left;
+	zval *zv, temp;
+	HashTable *hash;
+
+	n_elems = zend_hash_num_elements(Z_ARRVAL_P(array));
+
+	if (n_elems < 1) {
+		return;
+	}
+
+	hash = Z_ARRVAL_P(array);
+	n_left = n_elems;
+
+	if (!HT_IS_PACKED(hash)) {
+		if (!HT_HAS_STATIC_KEYS_ONLY(hash)) {
+			Bucket *p = hash->arData;
+			zend_long i = hash->nNumUsed;
+
+			for (; i > 0; p++, i--) {
+				if (p->key) {
+					zend_string_release(p->key);
+					p->key = NULL;
+				}
+			}
+		}
+		zend_hash_to_packed(hash);
+	}
+
+	if (EXPECTED(!HT_HAS_ITERATORS(hash))) {
+		if (hash->nNumUsed != hash->nNumOfElements) {
+			for (j = 0, idx = 0; idx < hash->nNumUsed; idx++) {
+				zv = hash->arPacked + idx;
+				if (Z_TYPE_P(zv) == IS_UNDEF) continue;
+				if (j != idx) {
+					ZVAL_COPY_VALUE(&hash->arPacked[j], zv);
+				}
+				j++;
+			}
+		}
+		while (--n_left) {
+			rnd_idx = php_colopl_bc_rand();
+			PHP_COLOPL_BC_RAND_RANGE(rnd_idx, 0, n_left, PHP_COLOPL_BC_RAND_MAX);
+			if (rnd_idx != n_left) {
+				ZVAL_COPY_VALUE(&temp, &hash->arPacked[n_left]);
+				ZVAL_COPY_VALUE(&hash->arPacked[n_left], &hash->arPacked[rnd_idx]);
+				ZVAL_COPY_VALUE(&hash->arPacked[rnd_idx], &temp);
+			}
+		}
+	} else {
+		zend_long iter_pos = zend_hash_iterators_lower_pos(hash, 0);
+
+		if (hash->nNumUsed != hash->nNumOfElements) {
+			for (j = 0, idx = 0; idx < hash->nNumUsed; idx++) {
+				zv = hash->arPacked + idx;
+				if (Z_TYPE_P(zv) == IS_UNDEF) continue;
+				if (j != idx) {
+					ZVAL_COPY_VALUE(&hash->arPacked[j], zv);
+					if (idx == iter_pos) {
+						zend_hash_iterators_update(hash, idx, j);
+						iter_pos = zend_hash_iterators_lower_pos(hash, iter_pos + 1);
+					}
+				}
+				j++;
+			}
+		}
+		while (--n_left) {
+			rnd_idx = php_colopl_bc_rand();
+			PHP_COLOPL_BC_RAND_RANGE(rnd_idx, 0, n_left, PHP_COLOPL_BC_RAND_MAX);
+			if (rnd_idx != n_left) {
+				ZVAL_COPY_VALUE(&temp, &hash->arPacked[n_left]);
+				ZVAL_COPY_VALUE(&hash->arPacked[n_left], &hash->arPacked[rnd_idx]);
+				ZVAL_COPY_VALUE(&hash->arPacked[rnd_idx], &temp);
+				zend_hash_iterators_update(hash, (uint32_t)rnd_idx, n_left);
+			}
+		}
+	}
+	hash->nNumUsed = n_elems;
+	hash->nInternalPointer = 0;
+	hash->nNextFreeElement = n_elems;
+}
+#endif
 
 PHP_FUNCTION(Colopl_ColoplBc_Php70_shuffle)
 {
@@ -403,7 +488,6 @@ PHP_FUNCTION(Colopl_ColoplBc_Php70_array_rand)
 }
 
 /* string.c */
-
 PHPAPI void php_colopl_bc_string_shuffle(char *str, zend_long len)
 {
 	zend_long n_elems, rnd_idx, n_left;

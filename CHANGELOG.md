@@ -1,4 +1,7 @@
-# 10.0.1 (Not Released)
+# 10.x.x (Not released yet)
+- n/a
+
+# 10.0.1
 - Extension: Support PHP 8.2
 - Library: Support PHP 8.2
 - Rector: APCToAPCUFunctionMigrateRector to more safely

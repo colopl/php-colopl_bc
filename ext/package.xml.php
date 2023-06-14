@@ -11,10 +11,13 @@ $maintainers = \array_map(
 );
 
 /** @var list<array{non-empty-string, non-empty-string, non-empty-string}> $releases */
-$releases = \array_map(
-    static fn (string $value): array => \explode("\t", $value),
-    \explode("\n", \trim(\shell_exec('git for-each-ref --format="%(refname:short)%09%(contents)" refs/tags') ?: ''))
-);
+$releases = \array_reverse(\array_filter(
+    \array_map(
+        static fn (string $value): array => \explode("\t", $value),
+        \explode("\n", \preg_replace('/^\n$/m', '',\shell_exec('git for-each-ref --format="%(refname:short)%09%(contents)" refs/tags') ?: '') ?? '')
+    ),
+    static fn (array $arr): bool => \count($arr) > 1
+));
 
 [$version_major, $version_minor, $version_patch] = \explode('.', \trim(\shell_exec('git describe --tags') ?: ''));
 
@@ -72,14 +75,14 @@ $files_tests = \array_map(
     <channel>pecl.php.net</channel>
     <summary>colopl_bc - BC Extension</summary>
     <description>Provides backwards compatibility for Legacy PHP versions.</description>
-    <?php foreach ($maintainers as [$name, $email]) : ?>
+<?php foreach ($maintainers as [$name, $email]) : ?>
     <lead>
         <name><?= $name ?></name>
         <user><?= \explode('@', $email)[0] ?></user>
         <email><?= $email ?></email>
         <active>yes</active>
     </lead>
-    <?php endforeach; ?>
+<?php endforeach; ?>
     <date><?= $now->format('Y-m-d') ?></date>
     <time><?= $now->format('H:i:s') ?></time>
     <version>

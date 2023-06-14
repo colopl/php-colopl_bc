@@ -9,16 +9,16 @@
     <channel>pecl.php.net</channel>
     <summary>colopl_bc - BC Extension</summary>
     <description>Provides backwards compatibility for Legacy PHP versions.</description>
-        <lead>
+    <lead>
         <name>Go Kudo</name>
         <user>g-kudo</user>
         <email>g-kudo@colopl.co.jp</email>
         <active>yes</active>
     </lead>
-        <date>2023-06-12</date>
-    <time>04:48:58</time>
+    <date>2023-06-14</date>
+    <time>08:30:55</time>
     <version>
-        <release>10.0.0</release>
+        <release>10.0.1</release>
         <api>10.0.0</api>
     </version>
     <stability>
@@ -26,16 +26,16 @@
         <api>stable</api>
     </stability>
     <license uri="http://www.php.net/license/3_01.txt">PHP License 3.01</license>
-    <notes>Release 10.0.0</notes>
+    <notes>Release 10.0.1</notes>
     <contents>
         <dir baseinstalldir="/" name="/">
-            <file md5sum="d1848793757f858005697487e5e02ace" name="config.h" role="src" />
+            <file md5sum="c245f7c12ce605b137bdbf6ba0b2f1ed" name="config.h" role="src" />
             <file md5sum="61ae0a1ac10a7aaccfa75b8c90f9ef99" name="php_colopl_bc_php74.h" role="src" />
             <file md5sum="f6d51c7ae64d205f5707a0467d658761" name="php_colopl_bc_php70.h" role="src" />
-            <file md5sum="e780c3df6d866a419d3452ecae883420" name="php_colopl_bc.h" role="src" />
+            <file md5sum="e8cf1d6ee58b8ab81faab3a3aaeead9e" name="php_colopl_bc.h" role="src" />
             <file md5sum="9eb36878045716f799506c9f2db89d61" name="colopl_bc_arginfo.h" role="src" />
             <file md5sum="cf75a13f4d873909c94168728a4f7e27" name="colopl_bc.c" role="src" />
-            <file md5sum="9369b2c19cbfb45bb1d6c916223f0dcf" name="colopl_bc_php70.c" role="src" />
+            <file md5sum="4a132e3ae5295bb9fb9aff63fe697d9c" name="colopl_bc_php70.c" role="src" />
             <file md5sum="e884ccdd609a22451b8321cf20a1f077" name="colopl_bc_php74.c" role="src" />
             <file md5sum="2c43c3a9d792c266341b19f33836f633" name="tests/php74/sort_mode_change.phpt" role="test" />
             <file md5sum="8654598c6468c1e43064db1616e0ed78" name="tests/php74/function/sort.phpt" role="test" />
@@ -66,6 +66,11 @@
             <file md5sum="b4beccc3da216c105937059cf79a474e" name="tests/php74/compare_mode_change.phpt" role="test" />
             <file md5sum="1376d1311693847245a5430e01082c45" name="tests/reflection.phpt" role="test" />
             <file md5sum="ef54fe376764ab5a67d201633acbbb6c" name="tests/availability.phpt" role="test" />
+            <file md5sum="b8b760b2f54fe9bf4444fdf16e5bad0a" name="tests/php70/str_shuffle_zts.phpt" role="test" />
+            <file md5sum="4188be08ae27af3e742a1b714f97c6b6" name="tests/php70/str_shuffle.phpt" role="test" />
+            <file md5sum="d4a830b439c6d0b94dfb3c72e6e14b84" name="tests/php70/array_rand.phpt" role="test" />
+            <file md5sum="917caa25575ace3c22f0ba87e995d52b" name="tests/php70/array_rand_zts.phpt" role="test" />
+            <file md5sum="4b7a10bf2a349cea55e3d12e43a59d0f" name="tests/php70/shuffle.phpt" role="test" />
             <file md5sum="9b606262ba26afd7d1db40b767ba26e8" name="tests/php70/mt_rand_compatibility.phpt" role="test" />
             <file md5sum="5d6e6dac4f7242cebd9f916506a0ca78" name="tests/php70/mt_rand_atomic.phpt" role="test" />
             <file md5sum="be6014b0dd93d0693a4f06de9ec09c2b" name="tests/php70/date_create.phpt" role="test" />
@@ -75,6 +80,7 @@
             <file md5sum="699bf1bb7ad29ff5044e99e97f3c2802" name="tests/php70/rand_incompatibility.phpt" role="test" />
             <file md5sum="acd17758bc50730efaa244b9822aa711" name="tests/php70/mt_rand_incompatibility.phpt" role="test" />
             <file md5sum="ac374ab0b2dacb4050f8684007dda7db" name="tests/php70/rand_compatibility.phpt" role="test" />
+            <file md5sum="e416af5b7f150ad0fe7b3f20a99d2eb2" name="tests/php70/shuffle_zts.phpt" role="test" />
         </dir>
     </contents>
     <dependencies>
@@ -91,7 +97,20 @@
     <extsrcrelease />
     <changelog>
         <release>
-            <date>2023-06-12</date>
+            <date>2023-06-14</date>
+            <version>
+                <release>10.0.1</release>
+                <api>10.0.0</api>
+            </version>
+            <stability>
+                <release>stable</release>
+                <api>stable</api>
+            </stability>
+            <license uri="http://www.php.net/license/3_01.txt">PHP License 3.01</license>
+            <notes>Release 10.0.1</notes>
+        </release>
+        <release>
+            <date>2023-06-14</date>
             <version>
                 <release>10.0.0</release>
                 <api>10.0.0</api>

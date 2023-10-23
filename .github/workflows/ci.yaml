@@ -1,5 +1,13 @@
 name: CI
-on: [push, pull_request]
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+  schedule:
+    - cron: '0 2 * * *'
 jobs:
   Library:
     runs-on: ubuntu-22.04
@@ -9,23 +17,15 @@ jobs:
         version: ["7.4", "8.0", "8.1", "8.2"]
     steps:
       - name: Checkout
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
       - name: Setup Buildx
-        uses: docker/setup-buildx-action@v2
-      - name: Cache
-        uses: actions/cache@v3
-        with:
-          path: ./vendor
-          key: library-composer-${{ hashFiles('composer.lock') }}
-          restore-keys: library-composer-${{ hashFiles('composer.lock') }}
+        uses: docker/setup-buildx-action@v3
       - name: Build Container
-        uses: docker/build-push-action@v4
+        uses: docker/build-push-action@v5
         with:
           build-args: |
             IMAGE=php
             TAG=${{ matrix.version }}-cli
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
           context: .
           file: ./build/library/Dockerfile
           load: true
@@ -43,22 +43,20 @@ jobs:
         distro: ["bullseye", "alpine"]
     steps:
         - name: Checkout
-          uses: actions/checkout@v3
+          uses: actions/checkout@v4
         - name: Setup QEMU
           uses: docker/setup-qemu-action@v2
           with:
             platforms: "arm64,s390x"
         - name: Setup Buildx
-          uses: docker/setup-buildx-action@v2
+          uses: docker/setup-buildx-action@v3
         - name: Build Container
-          uses: docker/build-push-action@v4
+          uses: docker/build-push-action@v5
           with:
             build-args: |
               IMAGE=${{ matrix.arch }}/php
               TAG=${{ matrix.version }}-${{ matrix.type }}-${{ matrix.distro }}
               PSKEL_SKIP_DEBUG=${{ matrix.arch != 'amd64' && '1' || '' }}
-            cache-from: type=gha
-            cache-to: type=gha,mode=max
             context: .
             load: true
             tags: "pskel-${{ matrix.arch }}-${{ matrix.type }}-${{ matrix.distro }}"

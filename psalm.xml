@@ -7,6 +7,7 @@
         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
         xmlns="https://getpsalm.org/schema/config"
         xsi:schemaLocation="https://getpsalm.org/schema/config vendor/vimeo/psalm/config.xsd"
+        errorBaseline="psalm-baseline.xml"
 >
     <projectFiles>
         <file name="library.php"/>
@@ -16,49 +17,4 @@
     <plugins>
         <pluginClass class="Psalm\PhpUnitPlugin\Plugin"/>
     </plugins>
-    <issueHandlers>
-        <ForbiddenCode>
-            <errorLevel type="suppress">
-                <file name="ext/package.xml.php"/>
-            </errorLevel>
-        </ForbiddenCode>
-        <DuplicateFunction>
-            <errorLevel type="suppress">
-                <file name="library.php"/>
-            </errorLevel>
-        </DuplicateFunction>
-        <DeprecatedFunction>
-            <errorLevel type="suppress">
-                <file name="library.php"/>
-                <directory name="tests"/>
-            </errorLevel>
-        </DeprecatedFunction>
-        <LessSpecificReturnType>
-            <errorLevel type="suppress">
-                <file name="library.php"/>
-            </errorLevel>
-        </LessSpecificReturnType>
-        <NullArgument>
-            <errorLevel type="suppress">
-                <referencedFunction name="Colopl\ColoplBc\Php70\srand"/>
-                <referencedFunction name="Colopl\ColoplBc\Php70\mt_srand"/>
-            </errorLevel>
-        </NullArgument>
-        <UnusedFunctionCall>
-            <errorLevel type="suppress">
-                <referencedFunction name="Colopl\ColoplBc\Php70\srand"/>
-                <referencedFunction name="Colopl\ColoplBc\Php70\mt_srand"/>
-            </errorLevel>
-        </UnusedFunctionCall>
-        <MissingConstructor>
-            <errorLevel type="suppress">
-                <directory name="src/Rector"/>
-            </errorLevel>
-        </MissingConstructor>
-        <MixedInferredReturnType>
-            <errorLevel type="suppress">
-                <file name="tests/Rector/AbstractSimpleRectorTestCase.php"/>
-            </errorLevel>
-        </MixedInferredReturnType>
-    </issueHandlers>
 </psalm>

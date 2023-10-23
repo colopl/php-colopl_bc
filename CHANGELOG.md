@@ -1,6 +1,10 @@
 # 10.x.x (Not released yet)
 - n/a
 
+# 10.0.2
+- Bump dependencies
+- CI minor fixes
+
 # 10.0.1
 - Extension: Support PHP 8.2
 - Library: Support PHP 8.2

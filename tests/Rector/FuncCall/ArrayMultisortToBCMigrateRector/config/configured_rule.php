@@ -6,6 +6,5 @@ use Colopl\ColoplBc\Rector\FuncCall\ArrayMultisortToBCMigrateRector;
 use Rector\Config\RectorConfig;
 
 return static function (RectorConfig $rectorConfig): void {
-    $services = $rectorConfig->services();
-    $services->set(ArrayMultisortToBCMigrateRector::class);
+    $rectorConfig->rule(ArrayMultisortToBCMigrateRector::class);
 };

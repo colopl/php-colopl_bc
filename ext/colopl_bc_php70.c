@@ -528,42 +528,20 @@ PHP_FUNCTION(Colopl_ColoplBc_Php70_str_shuffle)
 
 PHP_FUNCTION(Colopl_ColoplBc_Php70_date_create)
 {
-	zval *timezone_object = NULL;
-	char *time_str = NULL;
-	size_t time_str_len = 0;
-	zend_class_entry *date_ce_timezone = php_date_get_timezone_ce(), *date_ce_date = php_date_get_date_ce();
+	php_date_obj *date;
 
-	ZEND_PARSE_PARAMETERS_START(0, 2)
-		Z_PARAM_OPTIONAL
-		Z_PARAM_STRING(time_str, time_str_len)
-		Z_PARAM_OBJECT_OF_CLASS_OR_NULL(timezone_object, date_ce_timezone)
-	ZEND_PARSE_PARAMETERS_END();
+	COLOPL_BC_G(date_create_fptr)(INTERNAL_FUNCTION_PARAM_PASSTHRU);
 
-	php_date_instantiate(date_ce_date, return_value);
-	if (!php_date_initialize(Z_PHPDATE_P(return_value), time_str, time_str_len, NULL, timezone_object, 0)) {
-		zval_ptr_dtor(return_value);
-		RETURN_FALSE;
-	}
-	Z_PHPDATE_P(return_value)->time->us = 0;
+	date = Z_PHPDATE_P(return_value);
+	date->time->us = 0;
 }
 
 PHP_FUNCTION(Colopl_ColoplBc_Php70_date_create_immutable)
 {
-	zval *timezone_object = NULL;
-	char *time_str = NULL;
-	size_t time_str_len = 0;
-	zend_class_entry *date_ce_timezone = php_date_get_timezone_ce(), *date_ce_immutable = php_date_get_immutable_ce();
+	php_date_obj *date;
 
-	ZEND_PARSE_PARAMETERS_START(0, 2)
-		Z_PARAM_OPTIONAL
-		Z_PARAM_STRING(time_str, time_str_len)
-		Z_PARAM_OBJECT_OF_CLASS_OR_NULL(timezone_object, date_ce_timezone)
-	ZEND_PARSE_PARAMETERS_END();
+	COLOPL_BC_G(date_create_immutable_fptr)(INTERNAL_FUNCTION_PARAM_PASSTHRU);
 
-	php_date_instantiate(date_ce_immutable, return_value);
-	if (!php_date_initialize(Z_PHPDATE_P(return_value), time_str, time_str_len, NULL, timezone_object, 0)) {
-		zval_ptr_dtor(return_value);
-		RETURN_FALSE;
-	}
-	Z_PHPDATE_P(return_value)->time->us = 0;
+	date = Z_PHPDATE_P(return_value);
+	date->time->us = 0;
 }

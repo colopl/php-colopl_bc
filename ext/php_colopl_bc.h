@@ -37,7 +37,7 @@ extern zend_module_entry colopl_bc_module_entry;
 #define COLOPL_BC_PHP74_SORT_MODE_DEPRECATED	1
 #define COLOPL_BC_PHP74_SORT_MODE_LOG			2
 
-#define PHP_COLOPL_BC_VERSION "10.0.2"
+#define PHP_COLOPL_BC_VERSION "10.1.0"
 
 ZEND_BEGIN_MODULE_GLOBALS(colopl_bc)
 	bool rand_is_seeded;
@@ -55,6 +55,8 @@ ZEND_BEGIN_MODULE_GLOBALS(colopl_bc)
 	int (*php74_compare_func)(zval *op1, zval *op2);
 	zend_long php74_sort_mode;
  	void (*php74_hash_sort_func)(INTERNAL_FUNCTION_PARAMETERS, zval *array, bucket_compare_func_t compare_func, bool renumber);
+	zif_handler date_create_fptr;
+	zif_handler date_create_immutable_fptr;
 ZEND_END_MODULE_GLOBALS(colopl_bc)
 
 ZEND_EXTERN_MODULE_GLOBALS(colopl_bc)

@@ -3,7 +3,6 @@
 
 # 10.1.0
 - Support `colopl_timeshifter`
-- Optimize `date_create` and `date_create_immutable`
 
 # 10.0.2
 - Bump dependencies

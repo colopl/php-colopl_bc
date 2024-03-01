@@ -43,16 +43,6 @@ PHP_MINIT_FUNCTION(colopl_bc)
 
 	register_colopl_bc_symbols(module_number);
 
-	/* Get original func ptr's */
-	/* date_create */
-	fentry = zend_hash_str_find_ptr(CG(function_table), "date_create", strlen("date_create"));
-	ZEND_ASSERT(fentry);
-	COLOPL_BC_G(date_create_fptr) = fentry->internal_function.handler;
-	/* date_create_immutable */
-	fentry = zend_hash_str_find_ptr(CG(function_table), "date_create_immutable", strlen("date_create_immutable"));
-	ZEND_ASSERT(fentry);
-	COLOPL_BC_G(date_create_immutable_fptr) = fentry->internal_function.handler;
-
 	return SUCCESS;
 }
 

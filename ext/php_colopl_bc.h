@@ -55,8 +55,6 @@ ZEND_BEGIN_MODULE_GLOBALS(colopl_bc)
 	int (*php74_compare_func)(zval *op1, zval *op2);
 	zend_long php74_sort_mode;
  	void (*php74_hash_sort_func)(INTERNAL_FUNCTION_PARAMETERS, zval *array, bucket_compare_func_t compare_func, bool renumber);
-	zif_handler date_create_fptr;
-	zif_handler date_create_immutable_fptr;
 ZEND_END_MODULE_GLOBALS(colopl_bc)
 
 ZEND_EXTERN_MODULE_GLOBALS(colopl_bc)

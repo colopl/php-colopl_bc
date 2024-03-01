@@ -528,9 +528,12 @@ PHP_FUNCTION(Colopl_ColoplBc_Php70_str_shuffle)
 
 PHP_FUNCTION(Colopl_ColoplBc_Php70_date_create)
 {
+	zend_function *fn;
 	php_date_obj *date;
 
-	COLOPL_BC_G(date_create_fptr)(INTERNAL_FUNCTION_PARAM_PASSTHRU);
+	fn = zend_hash_str_find_ptr(CG(function_table), "date_create", strlen("date_create"));
+	ZEND_ASSERT(fn);
+	fn->internal_function.handler(INTERNAL_FUNCTION_PARAM_PASSTHRU);
 
 	date = Z_PHPDATE_P(return_value);
 	date->time->us = 0;
@@ -538,9 +541,12 @@ PHP_FUNCTION(Colopl_ColoplBc_Php70_date_create)
 
 PHP_FUNCTION(Colopl_ColoplBc_Php70_date_create_immutable)
 {
+	zend_function *fn;
 	php_date_obj *date;
 
-	COLOPL_BC_G(date_create_immutable_fptr)(INTERNAL_FUNCTION_PARAM_PASSTHRU);
+	fn = zend_hash_str_find_ptr(CG(function_table), "date_create_immutable", strlen("date_create_immutable"));
+	ZEND_ASSERT(fn);
+	fn->internal_function.handler(INTERNAL_FUNCTION_PARAM_PASSTHRU);
 
 	date = Z_PHPDATE_P(return_value);
 	date->time->us = 0;

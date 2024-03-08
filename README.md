@@ -2,7 +2,7 @@
 
 Provides various compatibility functions required for PHP (temporary) migration.
 
-> **WARNING**
+> [!WARNING]
 > This extension is intended for temporary use only. In other words, code in the production environment should not rely on this implementation as much as possible, and should be gradually phased out when it is safe to do so.
 
 ## Supported Versions
@@ -157,21 +157,21 @@ These compatibilities can also be checked at runtime. See the `colopl_bc.php74.c
 
 Seed random numbers.
 
-> **WARNING**
+> [!WARNING]
 > `srand()` provided by colopl_bc are based on the glibc `srand()` / `rand()` algorithm. The results may differ from those of the non glibc environments, e.g. Alpine Linux.
 
 - `Colopl\ColoplBc\Php70\rand()`
 
 Generate random numbers.
 
-> **WARNING**
+> [!WARNING]
 > `rand()` provided by colopl_bc are based on the glibc `srand()` / `rand()` algorithm. The results may differ from those of the non glibc environments, e.g. Alpine Linux.
 
 - `Colopl\ColoplBc\Php70\getrandmax()`
 
 Returns the maximum value that can be returned by a call to `Colopl\ColoplBc\Php70\rand()`.
 
-> **WARNING**
+> [!WARNING]
 > `rand()` provided by colopl_bc are based on the glibc `srand()` / `rand()` algorithm. The results may differ from those of the non glibc environments, e.g. Alpine Linux.
 
 
@@ -179,7 +179,7 @@ Returns the maximum value that can be returned by a call to `Colopl\ColoplBc\Php
 
 This function shuffles (randomizes the order of the elements in) an array.
 
-> **WARNING**
+> [!WARNING]
 > `shuffle()` use `Colopl\ColoplBc\Php70\rand()` algorithm internally, by colopl_bc are based on the glibc `srand()` / `rand()` algorithm. The results may differ from those of the non glibc environments, e.g. Alpine Linux.
 
 - `Colopl\ColoplBc\Php70\str_shuffle()`
@@ -187,14 +187,14 @@ This function shuffles (randomizes the order of the elements in) an array.
 str_shuffle() shuffles a string. One permutation of all possible is created.
 
 
-> **WARNING**
+> [!WARNING]
 > `str_shuffle()` use `Colopl\ColoplBc\Php70\rand()` algorighm internally, by colopl_bc are based on the glibc `srand()` / `rand()` algorithm. The results may differ from those of the non glibc environments, e.g. Alpine Linux.
 
 - `Colopl\ColoplBc\Php70\array_rand()`
 
 Picks one or more random entries out of an array, and returns the key (or keys) of the random entries.
 
-> **WARNING**
+> [!WARNING]
 > `array_rand()` use `Colopl\ColoplBc\Php70\rand()` algorithm internally, by colopl_bc are based on the glibc `srand()` / `rand()` algorithm. The results may differ from those of the non glibc environments, e.g. Alpine Linux.
 
 - `Colopl\ColoplBc\Php70\mt_srand()`
@@ -205,7 +205,7 @@ Always initialize the state using a **broken** Mersenne twister.
 
 Generate random numbers.
 
-> **WARNING**
+> [!WARNING]
 > This function previously caused undefined behavior and returned different results depending on the CPU architecture. The current behavior is forced to mimic the gcc + amd64 results, and may return different results for PHP in other environments.
 
 - `Colopl\ColoplBc\Php70\date_create()`

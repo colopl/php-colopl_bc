@@ -32,7 +32,7 @@ jobs:
           mkdir "artifacts"
           docker run --env VERSION="${{ github.ref_name }}" --rm -v"$(pwd)/artifacts:/tmp/artifacts" -i "pskel-build-ubuntu2204-${{ matrix.arch }}"
       - name: Upload deb Packages
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v3
         with:
           name: ubuntu_2204_debs
           path: artifacts/

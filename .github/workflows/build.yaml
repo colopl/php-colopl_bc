@@ -26,6 +26,7 @@ jobs:
           context: .
           file: ./build/ubuntu2204/Dockerfile
           load: true
+          tags: "pskel-build-ubuntu2204-${{ matrix.arch }}"
       - name: Build Extension with Container
         run: |
           mkdir "artifacts"

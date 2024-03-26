@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace Colopl\ColoplBc\Tests\Rector;
 
 use Iterator;
-use Rector\Core\Exception\ShouldNotHappenException;
+use Rector\Exception\ShouldNotHappenException;
 use Rector\Testing\PHPUnit\AbstractRectorTestCase;
 
 use const DIRECTORY_SEPARATOR as DS;
@@ -21,9 +21,14 @@ abstract class AbstractSimpleRectorTestCase extends AbstractRectorTestCase
         $this->doTestFile($file);
     }
 
-    public function provideData(): Iterator
+    /**
+     * @return iterable<array-key, array<array-key, string>>
+     */
+    public function provideData()
     {
-        return static::yieldFilesFromDirectory($this->getDir() . DS . 'Fixture');
+        /** @var iterable<array-key, array<array-key, string>> $iter */
+        $iter = static::yieldFilesFromDirectory($this->getDir() . DS . 'Fixture');
+        return $iter;
     }
 
 

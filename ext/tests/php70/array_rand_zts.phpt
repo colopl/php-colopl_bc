@@ -2,6 +2,8 @@
 Check for \Colopl\ColoplBc\Php70\array_rand() function compatibility. (ZTS)
 --EXTENSIONS--
 colopl_bc
+--INI--
+date.timezone=UTC
 --SKIPIF--
 <?php
 if (PHP_ZTS === 0) print 'skip NTS not supported';

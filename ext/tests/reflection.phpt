@@ -2,6 +2,8 @@
 Check for colopl_bc functions reflection information.
 --EXTENSIONS--
 colopl_bc
+--INI--
+date.timezone=UTC
 --FILE--
 <?php
 foreach ((new ReflectionExtension('colopl_bc'))->getFunctions() as $function) { echo $function; }

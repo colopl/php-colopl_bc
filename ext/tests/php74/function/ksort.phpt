@@ -3,6 +3,7 @@ Check for \Colopl\ColoplBc\Php74\ksort() function. (colopl_bc.php74.compare_mode
 --EXTENSIONS--
 colopl_bc
 --INI--
+date.timezone=UTC
 error_log=
 colopl_bc.php74.compare_mode=3
 colopl_bc.php74.sort_mode=3

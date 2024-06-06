@@ -3,6 +3,7 @@ Check for colopl_bc.php74.sort_mode change runtime
 --EXTENSIONS--
 colopl_bc
 --INI--
+date.timezone=UTC
 error_log=
 --FILE--
 <?php

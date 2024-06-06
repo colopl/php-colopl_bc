@@ -2,6 +2,8 @@
 Check for \Colopl\ColoplBc\Php70\mt_srand() function other environment compatibility.
 --EXTENSIONS--
 colopl_bc
+--INI--
+date.timezone=UTC
 --SKIPIF--
 <?php
 if (PHP_INT_SIZE !== 8) die("skip this test is for 64bit platform only");

@@ -2,6 +2,8 @@
 Check for \Colopl\ColoplBc\Php70\date_create_immutable() function.
 --EXTENSIONS--
 colopl_bc
+--INI--
+date.timezone=UTC
 --FILE--
 <?php
 

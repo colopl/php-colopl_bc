@@ -2,6 +2,8 @@
 Check for \Colopl\ColoplBc\Php70\str_shuffle() function compatibility.
 --EXTENSIONS--
 colopl_bc
+--INI--
+date.timezone=UTC
 --SKIPIF--
 <?php
 if (PHP_ZTS !== 0) print 'skip ZTS not supported'; 

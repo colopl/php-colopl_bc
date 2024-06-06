@@ -2,6 +2,8 @@
 Check for \Colopl\ColoplBc\Php70\mt_srand() function other environment incompatibility.
 --EXTENSIONS--
 colopl_bc
+--INI--
+date.timezone=UTC
 --FILE--
 <?php
 

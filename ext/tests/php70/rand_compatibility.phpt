@@ -1,5 +1,7 @@
 --TEST--
 Check for \Colopl\ColoplBc\Php70\srand() and srand() function other environment compatibility.
+--INI--
+date.timezone=UTC
 --SKIPIF--
 <?php
 if (!extension_loaded('colopl_bc')) print 'skip';

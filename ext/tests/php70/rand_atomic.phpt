@@ -2,6 +2,8 @@
 Check for \Colopl\ColoplBc\Php70\srand() function atomically.
 --EXTENSIONS--
 colopl_bc
+--INI--
+date.timezone=UTC
 --SKIPIF--
 <?php
 if (PHP_INT_SIZE !== 8) die("skip this test is for 64bit platform only");

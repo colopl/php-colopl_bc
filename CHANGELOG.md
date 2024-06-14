@@ -1,7 +1,9 @@
-# 10.x.x (Not released yet)
-- n/a
+# x.x.x (Not released yet)
 
-# 10.1.0
+# 11.0.1 (Not released yet)
+- More strict bundled tests
+
+# 11.0.0
 - Support `colopl_timeshifter`
 
 # 10.0.2

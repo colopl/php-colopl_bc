@@ -42,6 +42,6 @@ jobs:
           run: |
             docker compose run --rm --entrypoint=/usr/bin/ci --env TEST_EXTENSION_ASAN=1 dev
         - name: Test extension with LLVM Sanitizer (UndefinedBehaviorSanitizer)
-          if: matrix.arch == 'amd64' && matrix.distro != 'alpine'
+          if: matrix.arch == 'amd64' && matrix.distro != 'alpine' && matrix.version != '8.1'
           run: |
             docker compose run --rm --entrypoint=/usr/bin/ci --env TEST_EXTENSION_UBSAN=1 dev

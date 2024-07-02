@@ -16,15 +16,3 @@ services:
       - mysql
       - tidb
     command: ["sleep", "infinity"]
-  mysql:
-    image: mysql:8.0
-    environment:
-      MYSQL_ROOT_PASSWORD: testing
-      MYSQL_DATABASE: testing
-      MYSQL_USER: testing
-      MYSQL_PASSWORD: testing
-    volumes:
-      - ./docker/mysql/etc/mysql/conf.d/my.cnf:/etc/mysql/conf.d/my.cnf
-  tidb:
-    image: pingcap/tidb:v7.1.1
-

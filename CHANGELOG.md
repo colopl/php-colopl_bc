@@ -1,6 +1,7 @@
-# x.x.x (Not released yet)
+# 11.0.2-dev
+- Add official support for PHP 8.3
 
-# 11.0.1 (Not released yet)
+# 11.0.1
 - More strict bundled tests
 
 # 11.0.0

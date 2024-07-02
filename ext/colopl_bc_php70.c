@@ -28,6 +28,9 @@
 
 /* rand.c */
 
+#if defined(__clang__)
+__attribute__((no_sanitize("signed-integer-overflow")))
+#endif
 PHPAPI void php_colopl_bc_srand(zend_long seed)
 {
 #ifdef ZTS
@@ -59,6 +62,9 @@ PHPAPI void php_colopl_bc_srand(zend_long seed)
 	COLOPL_BC_G(rand_is_seeded) = 1;
 }
 
+#if defined(__clang__)
+__attribute__((no_sanitize("signed-integer-overflow")))
+#endif
 PHPAPI zend_long php_colopl_bc_rand(void)
 {
 	zend_long ret;

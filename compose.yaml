@@ -12,7 +12,4 @@ services:
       - ./ext:/usr/src/php/ext/extension:cached
       - ./:/work:cached
     tty: true
-    depends_on:
-      - mysql
-      - tidb
     command: ["sleep", "infinity"]

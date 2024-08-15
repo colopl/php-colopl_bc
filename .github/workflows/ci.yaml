@@ -1,18 +1,28 @@
 name: CI
-on: [push, pull_request]
+on:
+  push:
+    branches:
+        - main
+  pull_request:
+  schedule:
+    - cron: '0 0 * * 1'
+permissions:
+  contents: write
+  pull-requests: write
 jobs:
-  CI:
-    runs-on: ubuntu-22.04
-    timeout-minutes: 60
+  Linux:
+    runs-on: ubuntu-latest
     strategy:
       matrix:
-        arch: ["amd64", "arm64v8", "s390x"]
-        version: ["8.1", "8.2", "8.3"]
-        type: ["cli", "zts"]
-        distro: ["bookworm", "alpine"]
+        platform: ['linux/amd64', 'linux/arm64/v8', 'linux/s390x']
+        version: ['8.1', '8.2', '8.3']
+        type: ['cli', 'zts']
+        distro: ['bookworm', 'alpine']
     steps:
         - name: Checkout
           uses: actions/checkout@v4
+          with:
+            submodules: true
         - name: Setup QEMU
           uses: docker/setup-qemu-action@v3
           with:
@@ -21,27 +31,64 @@ jobs:
           uses: docker/setup-buildx-action@v3
         - name: Build container
           run: |
-            docker compose build --pull --no-cache --build-arg IMAGE=${{ matrix.arch }}/php --build-arg TAG=${{ matrix.version }}-${{ matrix.type }}-${{ matrix.distro }} --build-arg PSKEL_SKIP_DEBUG=${{ matrix.arch != 'amd64' && '1' || '' }}
-        - name: Run tests
+            docker compose build --pull --no-cache --build-arg PLATFORM="${{ matrix.platform }}" --build-arg IMAGE="php" --build-arg TAG="${{ matrix.version }}-${{ matrix.type }}-${{ matrix.distro }}"
+        - name: Test extension with Bundled PHP
           run: |
-            docker compose run --rm --entrypoint=/usr/bin/ci --env TEST_EXTENSION=1 dev
+            docker compose run --rm shell pskel test
         - name: Test extension with PHP Debug Build
-          if: matrix.arch == 'amd64'
+          if: matrix.platform == 'linux/amd64'
           run: |
-            docker compose run --rm --entrypoint=/usr/bin/ci --env TEST_EXTENSION_DEBUG=1 dev
+            docker compose run --rm shell pskel test debug
         - name: Test extension with Valgrind
-          if: matrix.arch == 'amd64'
+          if: matrix.platform == 'linux/amd64'
           run: |
-            docker compose run --rm --entrypoint=/usr/bin/ci --env TEST_EXTENSION_VALGRIND=1 dev
+            docker compose run --rm shell pskel test valgrind
         - name: Test extension with LLVM Sanitizer (MemorySanitizer)
-          if: matrix.arch == 'amd64' && matrix.distro != 'alpine'
+          if: matrix.platform == 'linux/amd64' && matrix.distro != 'alpine'
           run: |
-            docker compose run --rm --entrypoint=/usr/bin/ci --env TEST_EXTENSION_MSAN=1 dev
+            docker compose run --rm shell pskel test msan
         - name: Test extension with LLVM Sanitizer (AddressSanitizer)
-          if: matrix.arch == 'amd64' && matrix.distro != 'alpine'
+          if: matrix.platform == 'linux/amd64' && matrix.distro != 'alpine'
           run: |
-            docker compose run --rm --entrypoint=/usr/bin/ci --env TEST_EXTENSION_ASAN=1 dev
+            docker compose run --rm shell pskel test asan
         - name: Test extension with LLVM Sanitizer (UndefinedBehaviorSanitizer)
-          if: matrix.arch == 'amd64' && matrix.distro != 'alpine' && matrix.version != '8.1'
+          if: matrix.platform == 'linux/amd64' && matrix.distro != 'alpine'
           run: |
-            docker compose run --rm --entrypoint=/usr/bin/ci --env TEST_EXTENSION_UBSAN=1 dev
+            docker compose run --rm shell pskel test ubsan
+  # Windows:
+  #   runs-on: windows-2022
+  #   defaults:
+  #     run:
+  #       shell: cmd
+  #   strategy:
+  #     matrix:
+  #       platform: ["x64"]
+  #       version: ["8.1", "8.2", "8.3"]
+  #       ts: ["nts", "ts"]
+  #   steps:
+  #     - name: Checkout
+  #       uses: actions/checkout@v4
+  #     - name: Setup PHP
+  #       id: setup-php
+  #       uses: php/setup-php-sdk@v0.8
+  #       with:
+  #         platform: ${{ matrix.platform }}
+  #         version: ${{ matrix.version }}
+  #         ts: ${{ matrix.ts }}
+  #     - name: Enable developer command prompt
+  #       uses: ilammy/msvc-dev-cmd@v1
+  #       with:
+  #         platform: ${{ matrix.platform }}
+  #         toolset: ${{ steps.setup-php.outputs.toolset }}
+  #     - name: phpize
+  #       working-directory: ext
+  #       run: phpize
+  #     - name: configure
+  #       working-directory: ext
+  #       run: configure --enable-SKELETON_NAME --with-prefix=${{ steps.setup-php.outputs.prefix }}
+  #     - name: make
+  #       working-directory: ext
+  #       run: nmake
+  #     - name: test
+  #       working-directory: ext
+  #       run: nmake test TESTS="--show-diff tests"

@@ -1,15 +1,22 @@
 services:
-  dev:
+  shell:
     build:
       context: ./
       dockerfile: ./Dockerfile
     cap_add:
-      - SYS_PTRACE
+      - SYS_ADMIN
     security_opt:
       - seccomp:unconfined
     privileged: true
-    volumes:
-      - ./ext:/usr/src/php/ext/extension:cached
-      - ./:/work:cached
     tty: true
-    command: ["sleep", "infinity"]
+  #   depends_on:
+  #     - mysql
+  # mysql:
+  #   image: mysql:8.0
+  #   environment:
+  #     MYSQL_ROOT_PASSWORD: testing
+  #     MYSQL_DATABASE: testing
+  #     MYSQL_USER: testing
+  #     MYSQL_PASSWORD: testing
+  #   volumes:
+  #     - ./docker/mysql/etc/mysql/conf.d/my.cnf:/etc/mysql/conf.d/my.cnf

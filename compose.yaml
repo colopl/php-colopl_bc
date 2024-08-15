@@ -1,15 +1,11 @@
 services:
-  dev:
+  shell:
     build:
       context: ./
       dockerfile: ./Dockerfile
     cap_add:
-      - SYS_PTRACE
+      - SYS_ADMIN
     security_opt:
       - seccomp:unconfined
     privileged: true
-    volumes:
-      - ./ext:/usr/src/php/ext/extension:cached
-      - ./:/work:cached
     tty: true
-    command: ["sleep", "infinity"]

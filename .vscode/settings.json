@@ -1,0 +1,7 @@
+{
+  "files.associations": {
+    "*.phpt": "php",
+    "*.c": "c",
+    "*.h": "c"
+  }
+}

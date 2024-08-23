@@ -32,9 +32,9 @@ jobs:
         - name: Build container
           run: |
             docker compose build --pull --no-cache --build-arg PLATFORM="${{ matrix.platform }}" --build-arg IMAGE="php" --build-arg TAG="${{ matrix.version }}-${{ matrix.type }}-${{ matrix.distro }}"
-        - name: Test extension with Bundled PHP
+        - name: Test extension with Bundled PHP + PHP library test
           run: |
-            docker compose run --rm shell pskel test
+            docker compose run --rm shell library_test
         - name: Test extension with PHP Debug Build
           if: matrix.platform == 'linux/amd64'
           run: |
@@ -55,40 +55,3 @@ jobs:
           if: matrix.platform == 'linux/amd64' && matrix.distro != 'alpine'
           run: |
             docker compose run --rm shell pskel test ubsan
-  # Windows:
-  #   runs-on: windows-2022
-  #   defaults:
-  #     run:
-  #       shell: cmd
-  #   strategy:
-  #     matrix:
-  #       platform: ["x64"]
-  #       version: ["8.1", "8.2", "8.3"]
-  #       ts: ["nts", "ts"]
-  #   steps:
-  #     - name: Checkout
-  #       uses: actions/checkout@v4
-  #     - name: Setup PHP
-  #       id: setup-php
-  #       uses: php/setup-php-sdk@v0.8
-  #       with:
-  #         platform: ${{ matrix.platform }}
-  #         version: ${{ matrix.version }}
-  #         ts: ${{ matrix.ts }}
-  #     - name: Enable developer command prompt
-  #       uses: ilammy/msvc-dev-cmd@v1
-  #       with:
-  #         platform: ${{ matrix.platform }}
-  #         toolset: ${{ steps.setup-php.outputs.toolset }}
-  #     - name: phpize
-  #       working-directory: ext
-  #       run: phpize
-  #     - name: configure
-  #       working-directory: ext
-  #       run: configure --enable-SKELETON_NAME --with-prefix=${{ steps.setup-php.outputs.prefix }}
-  #     - name: make
-  #       working-directory: ext
-  #       run: nmake
-  #     - name: test
-  #       working-directory: ext
-  #       run: nmake test TESTS="--show-diff tests"

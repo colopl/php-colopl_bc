@@ -31,3 +31,18 @@ RUN docker-php-source extract \
 COPY ./pskel.sh /usr/local/bin/pskel
 COPY ./patches /patches
 COPY ./ext /ext
+
+# ----
+
+COPY --from=composer:2 /usr/bin/composer /usr/bin/composer
+
+COPY ./ /project
+COPY ./library_test.sh /usr/local/bin/library_test
+
+ENV COMPOSER_ROOT_VERSION="9.9.9"
+
+RUN if test -f "/etc/debian_version"; then \
+      apt-get update && apt-get install -y "unzip"; \
+    else \
+      apk add --no-cache "unzip"; \
+    fi

@@ -1,0 +1,11 @@
+--- ext/build/ltmain.sh	2024-08-20 13:47:39.489351765 +0000
++++ ext/build/ltmain.sh	2024-08-20 13:51:02.825496572 +0000
+@@ -3467,7 +3467,7 @@ EOF
+ 	tempremovelist=`$echo "$output_objdir/*"`
+ 	for p in $tempremovelist; do
+ 	  case $p in
+-	    *.$objext)
++	    *.$objext | *.gcno)
+ 	       ;;
+ 	    $output_objdir/$outputname | $output_objdir/$libname.* | $output_objdir/${libname}${release}.*)
+ 	       if test "X$precious_files_regex" != "X"; then

@@ -1,5 +1,6 @@
 # 11.0.2-dev
 - Add official support for PHP 8.3
+- Upgrade pskel
 
 # 11.0.1
 - More strict bundled tests

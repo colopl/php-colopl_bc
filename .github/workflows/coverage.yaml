@@ -1,0 +1,65 @@
+name: Coverage
+permissions:
+  contents: write
+  pull-requests: write
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    types:
+      - opened
+      - synchronize
+      - reopened
+jobs:
+  Linux:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        version: ['8.3']
+        type: ['cli', 'zts']
+        distro: ['bookworm']
+    outputs:
+      matrix: ${{ toJson(matrix) }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          submodules: true
+      - name: Setup buildx
+        uses: docker/setup-buildx-action@v3
+      - name: Build container
+        run: |
+          docker compose build --pull --no-cache --build-arg PLATFORM="linux/amd64" --build-arg IMAGE="php" --build-arg TAG="${{ matrix.version }}-${{ matrix.type }}-${{ matrix.distro }}"
+      - name: Test with gcov
+        run: |
+          docker compose run -v "$(pwd)/ext:/ext" --rm shell pskel coverage
+      - name: Upload coverage to artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-${{ matrix.version }}-${{ matrix.type }}-${{ matrix.distro }}
+          path: ${{ github.workspace }}/ext/lcov.info
+  Coverage:
+    needs: [Linux]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Download coverage artifacts
+        uses: actions/download-artifact@v4
+      - name: Merge coverages
+        run: |
+          sudo apt-get install -y "lcov"
+          LCOV_FILES="$(find . -name "lcov.info")"
+          CMD="$(which "lcov")"
+          for LCOV_FILE in ${LCOV_FILES}; do
+            CMD+=" -a ${LCOV_FILE}"
+          done
+          CMD+=" -o lcov.info"
+          echo "Merging coverages: ${LCOV_FILES}"
+          ${CMD}
+      - name: Report coverage
+        uses: k1LoW/octocov-action@v1
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          config: .github/octocov.yml

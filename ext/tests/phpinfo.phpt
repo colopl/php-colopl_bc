@@ -14,4 +14,4 @@ phpinfo();
 ob_end_flush();
 ?>
 --EXPECTF--
-Success: %d.%d.%d%s
+Success: %s

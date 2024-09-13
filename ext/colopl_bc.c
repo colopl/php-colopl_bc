@@ -66,7 +66,7 @@ PHP_MINFO_FUNCTION(colopl_bc)
 {
 	php_info_print_table_start();
 	php_info_print_table_header(2, "colopl_bc support", "enabled");
-	php_info_print_table_row(2, "timeshifter version", PHP_COLOPL_BC_VERSION);
+	php_info_print_table_row(2, "bc version", PHP_COLOPL_BC_VERSION);
 	php_info_print_table_end();
 }
 

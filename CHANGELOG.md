@@ -1,4 +1,7 @@
-# 11.0.2-dev
+# 11.0.3
+- Add support for PHP 8.4
+
+# 11.0.2
 - Add official support for PHP 8.3
 - Upgrade pskel
 

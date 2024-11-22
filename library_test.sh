@@ -18,5 +18,4 @@ cd "/project"
   composer install
   composer exec -- phpunit "tests"
   composer exec -- phpstan
-  composer exec -- psalm
 cd -

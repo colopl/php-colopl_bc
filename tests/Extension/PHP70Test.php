@@ -21,7 +21,7 @@ final class PHP70Test extends AbstractTestCase
     {
         \Colopl\ColoplBc\Php70\srand(1234);
 
-        if (\PHP_ZTS === 0) {
+        if (\PHP_ZTS === 0 || \PHP_ZTS === false) {
             self::assertSame(\Colopl\ColoplBc\Php70\rand(), 479142414);
         } else {
             self::assertSame(\Colopl\ColoplBc\Php70\rand(), 1584308507);
@@ -43,7 +43,7 @@ final class PHP70Test extends AbstractTestCase
          * @psalm-suppress PossiblyNullArgument
          */
         \Colopl\ColoplBc\Php70\srand($seed);
-        if (\PHP_ZTS === 0) {
+        if (\PHP_ZTS === 0 || \PHP_ZTS === false) {
             self::assertSame(\Colopl\ColoplBc\Php70\rand(), 1804289383);
         } else {
             self::assertSame(\Colopl\ColoplBc\Php70\rand(), 1012484);
@@ -53,7 +53,7 @@ final class PHP70Test extends AbstractTestCase
     public function testRand(): void
     {
         \Colopl\ColoplBc\Php70\srand(5678);
-        if (\PHP_ZTS === 0) {
+        if (\PHP_ZTS === 0 || \PHP_ZTS === false) {
             self::assertSame(\Colopl\ColoplBc\Php70\rand(), 1860157456);
         } else {
             self::assertSame(\Colopl\ColoplBc\Php70\rand(), 1173971923);
@@ -71,7 +71,7 @@ final class PHP70Test extends AbstractTestCase
         \Colopl\ColoplBc\Php70\srand(1234);
         \Colopl\ColoplBc\Php70\shuffle($arr);
 
-        if (\PHP_ZTS === 0) {
+        if (\PHP_ZTS === 0 || \PHP_ZTS === false) {
             self::assertSame($arr, [2, 3, 4, 1]);
         } else {
             self::assertSame($arr, [4, 2, 1, 3]);
@@ -83,7 +83,7 @@ final class PHP70Test extends AbstractTestCase
         $str = 'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat. Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur. Excepteur sint occaecat cupidatat non proident, sunt in culpa qui officia deserunt mollit anim id est laborum.';
         \Colopl\ColoplBc\Php70\srand(1234);
 
-        if (\PHP_ZTS === 0) {
+        if (\PHP_ZTS === 0 || \PHP_ZTS === false) {
             self::assertSame(
                 \Colopl\ColoplBc\Php70\str_shuffle($str),
                 'cfapiqi uogi txnrdaeqvnataten ume v aiisalm  isiatdaduaeudr eenteotscdm itdenrieuaicii loi aaot imxll ne luecat uri ipp a l moplaur tsarc.eptuisrccdlotep ecorU oeaceqsuerno .t li sa  rerldulidieoor i n nd  tloiii eeulds  ithsnot btrnf ilm a,nuto umdscd viee.amndrueonmce ns dancratmamo inuios ilmo sg a neo ci. eispiisu pueoe umurt denaamlmiu ,loi ptctaurst lrinm usLrdto  gru coaetucnuliittro, npemeDnpt s,efdlq q teoiabuEet ert ioinu tlbxoo o '
@@ -100,7 +100,7 @@ final class PHP70Test extends AbstractTestCase
     {
         \Colopl\ColoplBc\Php70\srand(1234);
 
-        if (\PHP_ZTS === 0) {
+        if (\PHP_ZTS === 0 || \PHP_ZTS === false) {
             self::assertSame(
                 \Colopl\ColoplBc\Php70\array_rand([1, 2, 3, 4, 5], 3),
                 [0, 1, 3]

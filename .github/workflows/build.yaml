@@ -7,7 +7,7 @@ jobs:
     timeout-minutes: 60
     strategy:
       matrix:
-        platform: ["linux/arm64v8", "linux/amd64"]
+        platform: ["linux/arm64/v8", "linux/amd64"]
     steps:
       - name: Checkout
         uses: actions/checkout@v4

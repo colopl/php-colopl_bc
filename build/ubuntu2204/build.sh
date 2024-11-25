@@ -8,7 +8,7 @@ cd "/tmp/ext"
   checkinstall \
         --pkgname="php-colopl-bc" \
         --pkglicense="PHP-3.01" \
-        --pkgversion="9999.9999.9999" \
+        --pkgversion="${VERSION}" \
         --pkggroup="php" \
         --maintainer="g-kudo@colopl.co.jp" \
         --requires="php" \

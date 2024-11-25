@@ -21,7 +21,12 @@
 #define PHP_COLOPL_BC_H
 
 #include "php.h"
+
+#if PHP_VERSION_ID < 80400
 #include "ext/standard/php_lcg.h"
+#else
+#include "ext/random/php_random.h"
+#endif
 
 #include "php_colopl_bc_php70.h"
 #include "php_colopl_bc_php74.h"
@@ -37,7 +42,7 @@ extern zend_module_entry colopl_bc_module_entry;
 #define COLOPL_BC_PHP74_SORT_MODE_DEPRECATED	1
 #define COLOPL_BC_PHP74_SORT_MODE_LOG			2
 
-#define PHP_COLOPL_BC_VERSION "11.0.2"
+#define PHP_COLOPL_BC_VERSION "11.0.3"
 
 ZEND_BEGIN_MODULE_GLOBALS(colopl_bc)
 	bool rand_is_seeded;

@@ -3,7 +3,14 @@ permissions:
   contents: write
   pull-requests: write
 on:
-  workflow_dispatch:
+  push:
+    branches:
+      - main
+  pull_request:
+    types:
+      - opened
+      - synchronize
+      - reopened
 jobs:
   Linux:
     runs-on: ubuntu-latest

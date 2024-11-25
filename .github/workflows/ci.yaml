@@ -1,6 +1,11 @@
 name: CI
 on:
-  workflow_dispatch:
+  push:
+    branches:
+        - main
+  pull_request:
+  schedule:
+    - cron: '0 0 * * 1'
 permissions:
   contents: write
   pull-requests: write

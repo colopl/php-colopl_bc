@@ -21,6 +21,7 @@ final class PHP70Test extends AbstractTestCase
     {
         \Colopl\ColoplBc\Php70\srand(1234);
 
+        /** @phpstan-ignore-next-line */
         if (\PHP_ZTS === 0 || \PHP_ZTS === false) {
             self::assertSame(\Colopl\ColoplBc\Php70\rand(), 479142414);
         } else {
@@ -43,6 +44,7 @@ final class PHP70Test extends AbstractTestCase
          * @psalm-suppress PossiblyNullArgument
          */
         \Colopl\ColoplBc\Php70\srand($seed);
+        /** @phpstan-ignore-next-line */
         if (\PHP_ZTS === 0 || \PHP_ZTS === false) {
             self::assertSame(\Colopl\ColoplBc\Php70\rand(), 1804289383);
         } else {
@@ -53,6 +55,7 @@ final class PHP70Test extends AbstractTestCase
     public function testRand(): void
     {
         \Colopl\ColoplBc\Php70\srand(5678);
+        /** @phpstan-ignore-next-line */
         if (\PHP_ZTS === 0 || \PHP_ZTS === false) {
             self::assertSame(\Colopl\ColoplBc\Php70\rand(), 1860157456);
         } else {
@@ -71,6 +74,7 @@ final class PHP70Test extends AbstractTestCase
         \Colopl\ColoplBc\Php70\srand(1234);
         \Colopl\ColoplBc\Php70\shuffle($arr);
 
+        /** @phpstan-ignore-next-line */
         if (\PHP_ZTS === 0 || \PHP_ZTS === false) {
             self::assertSame($arr, [2, 3, 4, 1]);
         } else {
@@ -83,6 +87,7 @@ final class PHP70Test extends AbstractTestCase
         $str = 'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat. Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur. Excepteur sint occaecat cupidatat non proident, sunt in culpa qui officia deserunt mollit anim id est laborum.';
         \Colopl\ColoplBc\Php70\srand(1234);
 
+        /** @phpstan-ignore-next-line */
         if (\PHP_ZTS === 0 || \PHP_ZTS === false) {
             self::assertSame(
                 \Colopl\ColoplBc\Php70\str_shuffle($str),
@@ -100,6 +105,7 @@ final class PHP70Test extends AbstractTestCase
     {
         \Colopl\ColoplBc\Php70\srand(1234);
 
+        /** @phpstan-ignore-next-line */
         if (\PHP_ZTS === 0 || \PHP_ZTS === false) {
             self::assertSame(
                 \Colopl\ColoplBc\Php70\array_rand([1, 2, 3, 4, 5], 3),

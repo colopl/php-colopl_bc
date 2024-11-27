@@ -6,7 +6,7 @@ colopl_bc
 date.timezone=UTC
 --SKIPIF--
 <?php
-if (PHP_ZTS === 0 || PHP_ZTS === false) print 'skip NTS not supported';
+if ((bool) PHP_ZTS === false) print 'skip NTS not supported';
 ?>
 --FILE--
 <?php

@@ -6,7 +6,7 @@ colopl_bc
 date.timezone=UTC
 --SKIPIF--
 <?php
-if (PHP_ZTS !== 0) print 'skip ZTS not supported'; 
+if ((bool) PHP_ZTS === true) print 'skip ZTS not supported'; 
 if (PHP_INT_SIZE !== 8) die("skip this test is for 64bit platform only");
 ?>
 --FILE--

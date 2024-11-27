@@ -4,8 +4,6 @@ coverage:
   acceptable: current >= 50%
 testExecutionTime:
   if: false
-comment:
-  if: is_pull_request
 diff:
   datastores:
     - artifact://${GITHUB_REPOSITORY}

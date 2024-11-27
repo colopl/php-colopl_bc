@@ -1,6 +1,6 @@
-ARG ARCH=amd64
+ARG PLATFORM=linux/amd64
 
-FROM ${ARCH}/ubuntu:22.04
+FROM --platform=${PLATFORM} ubuntu:22.04
 
 RUN apt-get update && \
     DEBIAN_FRONTEND="noninteractive" apt-get install -y "php" "php-dev" "checkinstall"

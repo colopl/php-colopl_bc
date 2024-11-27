@@ -9,7 +9,7 @@ jobs:
     timeout-minutes: 60
     strategy:
       matrix:
-        arch: ["arm64v8", "amd64"]
+        platform: ["linux/arm64/v8", "linux/amd64"]
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -22,17 +22,21 @@ jobs:
       - name: Build Container
         uses: docker/build-push-action@v6
         with:
-          build-args: ARCH=${{ matrix.arch }}
+          build-args: PLATFORM=${{ matrix.platform }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
           context: .
           file: ./build/ubuntu2204/Dockerfile
           load: true
-          tags: "pskel-build-ubuntu2204-${{ matrix.arch }}"
+          tags: "pskel-build-ubuntu2204-${{ matrix.platform }}"
       - name: Build Extension with Container
+        id: build_container
         run: |
+          echo "arch=$(echo "${{ matrix.platform }}" | sed "s/^linux\///g" | sed "s/\//_/g")" >> $GITHUB_OUTPUT
           mkdir "artifacts"
-          docker run --env VERSION="${{ github.ref_name }}" --rm -v"$(pwd)/artifacts:/tmp/artifacts" -i "pskel-build-ubuntu2204-${{ matrix.arch }}"
+          docker run --env VERSION="${{ github.ref_name }}" --rm -v"$(pwd)/artifacts:/tmp/artifacts" -i "pskel-build-ubuntu2204-${{ matrix.platform }}"
       - name: Upload deb Packages
         uses: actions/upload-artifact@v4
         with:
-          name: ubuntu_2204_debs-${{ matrix.arch }}
+          name: ubuntu_2204_debs_${{ steps.build_container.outputs.arch }}
           path: artifacts/

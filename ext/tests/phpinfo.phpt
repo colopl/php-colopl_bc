@@ -2,6 +2,8 @@
 Check phpinfo()
 --EXTENSIONS--
 colopl_bc
+--INI--
+date.timezone=UTC
 --FILE--
 <?php
 ob_start(

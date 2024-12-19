@@ -1,3 +1,6 @@
+# 11.0.4
+- Fix `phpinfo.phpt` for timezone
+
 # 11.0.3
 - Add support for PHP 8.4
 

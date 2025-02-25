@@ -1,4 +1,5 @@
 # 11.0.5 (WIP)
+- Fix SEGV on date_create, date_create_immutable (#30, https://github.com/colopl/php-colopl_bc/issues/30)
 - Overhaul GitHub Actions
 
 # 11.0.4

@@ -42,7 +42,7 @@ extern zend_module_entry colopl_bc_module_entry;
 #define COLOPL_BC_PHP74_SORT_MODE_DEPRECATED	1
 #define COLOPL_BC_PHP74_SORT_MODE_LOG			2
 
-#define PHP_COLOPL_BC_VERSION "11.0.4"
+#define PHP_COLOPL_BC_VERSION "11.0.5"
 
 ZEND_BEGIN_MODULE_GLOBALS(colopl_bc)
 	bool rand_is_seeded;

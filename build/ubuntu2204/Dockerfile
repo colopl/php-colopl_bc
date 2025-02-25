@@ -1,4 +1,4 @@
-ARG PLATFORM=linux/amd64
+ARG PLATFORM=${BUILDPLATFORM:-linux/amd64}
 
 FROM --platform=${PLATFORM} ubuntu:22.04
 

@@ -30,18 +30,8 @@ final class PHP70Test extends AbstractTestCase
 
     public function testSRandNull(): void
     {
-        $seed = \null;
+        $seed = (int) \null;
 
-        if (\PHP_VERSION_ID >= 80100) {
-            /* PHP 8.1 does not support null -> 0 auto casting. */
-            $seed = (int) $seed;
-        }
-
-        /**
-         * @phpstan-ignore-next-line
-         * @psalm-suppress UnusedFunctionCall
-         * @psalm-suppress PossiblyNullArgument
-         */
         \Colopl\ColoplBc\Php70\srand($seed);
         if ((bool) \PHP_ZTS === false) {
             self::assertSame(\Colopl\ColoplBc\Php70\rand(), 1804289383);
@@ -121,17 +111,9 @@ final class PHP70Test extends AbstractTestCase
 
     public function testMtSRandNull(): void
     {
-        $seed = \null;
+        /* PHP 8.1 does not support null -> 0 auto casting. */
+        $seed = (int) \null;
 
-        if (\PHP_VERSION_ID >= 80100) {
-            /* PHP 8.1 does not support null -> 0 auto casting. */
-            $seed = (int) $seed;
-        }
-
-        /**
-         * @phpstan-ignore-next-line
-         * @psalm-suppress PossiblyNullArgument
-         */
         \Colopl\ColoplBc\Php70\mt_srand($seed);
         self::assertSame(
             \Colopl\ColoplBc\Php70\mt_rand(),
@@ -160,8 +142,7 @@ final class PHP70Test extends AbstractTestCase
         foreach ($dates as $date) {
             self::assertInstanceOf(\DateTime::class, $date);
             /**
-             * @phpstan-ignore-next-line
-             * @psalm-suppress RedundantConditionGivenDocblockType
+             * @phpstan-ignore instanceof.alwaysTrue
              */
             self::assertSame($date instanceof \DateTime ? $date->format('u') : \null, '000000');
         }
@@ -177,8 +158,7 @@ final class PHP70Test extends AbstractTestCase
         foreach ($dates as $date) {
             self::assertInstanceOf(\DateTimeImmutable::class, $date);
             /**
-             * @phpstan-ignore-next-line
-             * @psalm-suppress RedundantConditionGivenDocblockType
+             * @phpstan-ignore instanceof.alwaysTrue
              */
             self::assertSame($date instanceof \DateTimeImmutable ? $date->format('u') : \null, '000000');
         }

@@ -1,4 +1,8 @@
 /ext/*.dep
 /ext/*~
+/vendor
+/artifacts
 *.DS_Store
 lcov.info
+.phpunit.result.cache
+composer.lock

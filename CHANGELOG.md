@@ -1,3 +1,6 @@
+# 11.0.5 (WIP)
+- Overhaul GitHub Actions
+
 # 11.0.4
 - Fix `phpinfo.phpt` for timezone
 

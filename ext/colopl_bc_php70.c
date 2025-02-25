@@ -116,7 +116,7 @@ PHP_FUNCTION(Colopl_ColoplBc_Php70_rand)
 {
 	zend_long min, max, number;
 	int argc;
-	
+
 	number = php_colopl_bc_rand();
 	argc = ZEND_NUM_ARGS();
 
@@ -541,8 +541,10 @@ PHP_FUNCTION(Colopl_ColoplBc_Php70_date_create)
 	ZEND_ASSERT(fn);
 	fn->internal_function.handler(INTERNAL_FUNCTION_PARAM_PASSTHRU);
 
-	date = Z_PHPDATE_P(return_value);
-	date->time->us = 0;
+	if (Z_TYPE_P(return_value) != IS_FALSE) {
+		date = Z_PHPDATE_P(return_value);
+		date->time->us = 0;
+	}
 }
 
 PHP_FUNCTION(Colopl_ColoplBc_Php70_date_create_immutable)
@@ -554,6 +556,8 @@ PHP_FUNCTION(Colopl_ColoplBc_Php70_date_create_immutable)
 	ZEND_ASSERT(fn);
 	fn->internal_function.handler(INTERNAL_FUNCTION_PARAM_PASSTHRU);
 
-	date = Z_PHPDATE_P(return_value);
-	date->time->us = 0;
+	if (Z_TYPE_P(return_value) != IS_FALSE) {
+		date = Z_PHPDATE_P(return_value);
+		date->time->us = 0;
+	}
 }

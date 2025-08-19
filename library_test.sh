@@ -17,5 +17,5 @@ cd "/project"
   fi
   composer install
   composer exec -- phpunit "tests"
-  composer exec -- phpstan
+  composer exec -- phpstan --memory-limit=-1
 cd -

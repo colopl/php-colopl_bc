@@ -1,6 +1,6 @@
 ARG PLATFORM=${BUILDPLATFORM:-linux/amd64}
 ARG IMAGE=php
-ARG TAG=8.4-cli-bookworm
+ARG TAG=8.4-cli-trixie
 
 FROM --platform=${PLATFORM} ${IMAGE}:${TAG}
 
@@ -14,7 +14,7 @@ RUN docker-php-source extract \
       apt-get update \
  &&   DEBIAN_FRONTEND="noninteractive" apt-get install -y "bison" "re2c" "zlib1g-dev" "libsqlite3-dev" "libxml2-dev" \
         "autoconf" "pkg-config" "make" "gcc" "valgrind" "rsync" "git" "ssh" \
-        "clang-19" \
+        "clang" \
         "lcov" "gzip" \
         "vim" \
  &&   update-alternatives --install "/usr/bin/clang" clang "/usr/bin/clang-19" 100 \

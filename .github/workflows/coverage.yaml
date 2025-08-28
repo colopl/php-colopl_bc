@@ -54,27 +54,28 @@ jobs:
         run: |
           LCOV_FILES=$(find coverage-artifacts -name "lcov.info" -type f)
 
-          if [ -z "$LCOV_FILES" ]; then
+          if [ -z "${LCOV_FILES}" ]; then
             echo "No lcov.info files found in the artifacts!"
             exit 1
           fi
 
-          CMD="lcov"
-          for LCOV_FILE in $LCOV_FILES; do
-            echo "Adding coverage file: $LCOV_FILE"
-            CMD+=" -a $LCOV_FILE"
+          CMD="$(which "lcov")"
+          CMD+=" --ignore-errors format"
+          for LCOV_FILE in ${LCOV_FILES}; do
+            echo "Adding coverage file: ${LCOV_FILE}"
+            CMD+=" -a ${LCOV_FILE}"
           done
           CMD+=" -o lcov.info"
 
-          echo "Executing: $CMD"
-          eval $CMD
+          echo "Executing: `${CMD}`"
+          eval "${CMD}"
 
           if [ ! -f "lcov.info" ]; then
             echo "Failed to generate merged lcov.info file!"
             exit 1
           fi
 
-          echo "Successfully merged $(echo $LCOV_FILES | wc -w) coverage files."
+          echo "Successfully merged $(echo "${LCOV_FILES}" | wc -w) coverage files."
       - name: Report coverage
         uses: k1LoW/octocov-action@v1
         with:

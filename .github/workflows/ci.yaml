@@ -15,7 +15,7 @@ jobs:
         runs-on: ['ubuntu-24.04', 'ubuntu-24.04-arm']
         version: ['8.1', '8.2', '8.3', '8.4']
         type: ['cli', 'zts']
-        distro: ['bookworm', 'alpine']
+        distro: ['trixie', 'alpine']
     runs-on: ${{ matrix.runs-on }}
     steps:
       - name: Checkout
@@ -48,7 +48,7 @@ jobs:
         platform: ['linux/s390x']
         version: ['8.1', '8.2', '8.3', '8.4']
         type: ['cli', 'zts']
-        distro: ['bookworm', 'alpine']
+        distro: ['trixie', 'alpine']
     steps:
         - name: Checkout
           uses: actions/checkout@v5

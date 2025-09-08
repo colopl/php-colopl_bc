@@ -13,9 +13,12 @@ jobs:
     strategy:
       matrix:
         runs-on: ['ubuntu-24.04', 'ubuntu-24.04-arm']
-        version: ['8.1', '8.2', '8.3', '8.4']
+        version: ['8.1', '8.2', '8.3', '8.4', '8.5.0beta2']
         type: ['cli', 'zts']
         distro: ['trixie', 'alpine']
+        exclude:
+          - version: '8.5.0beta2'
+            distro: 'alpine'
     runs-on: ${{ matrix.runs-on }}
     steps:
       - name: Checkout
@@ -45,10 +48,13 @@ jobs:
     runs-on: ubuntu-24.04
     strategy:
       matrix:
-        platform: ['linux/s390x']
-        version: ['8.1', '8.2', '8.3', '8.4']
+        runs-on: ['ubuntu-24.04', 'ubuntu-24.04-arm']
+        version: ['8.1', '8.2', '8.3', '8.4', '8.5.0beta2']
         type: ['cli', 'zts']
         distro: ['trixie', 'alpine']
+        exclude:
+          - version: '8.5.0beta2'
+            distro: 'alpine'
     steps:
         - name: Checkout
           uses: actions/checkout@v5

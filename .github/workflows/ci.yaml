@@ -48,7 +48,7 @@ jobs:
     runs-on: ubuntu-24.04
     strategy:
       matrix:
-        runs-on: ['ubuntu-24.04', 'ubuntu-24.04-arm']
+        platform: ['ubuntu-24.04', 'ubuntu-24.04-arm']
         version: ['8.1', '8.2', '8.3', '8.4', '8.5.0beta2']
         type: ['cli', 'zts']
         distro: ['trixie', 'alpine']

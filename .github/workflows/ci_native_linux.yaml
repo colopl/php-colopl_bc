@@ -1,0 +1,60 @@
+name: CI Native Linux
+on:
+  workflow_call:
+jobs:
+  Linux:
+    strategy:
+      matrix:
+        runs-on: ['ubuntu-24.04', 'ubuntu-24.04-arm']
+        version: ['8.1', '8.2', '8.3', '8.4']
+        type: ['cli', 'zts']
+        distro: ['trixie', 'alpine']
+    runs-on: ${{ matrix.runs-on }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+        with:
+          submodules: true
+      - name: Pull PHP container image
+        id: pull-image
+        run: |
+          docker pull "php:${{ matrix.version }}-${{ matrix.type }}-${{ matrix.distro }}"
+          IMAGE_HASH="$(docker inspect "php:${{ matrix.version }}-${{ matrix.type }}-${{ matrix.distro }}" --format '{{.Id}}' | cut -d: -f2)"
+          echo "image_hash=${IMAGE_HASH:0:16}" >> "${GITHUB_OUTPUT}"
+      - name: Generate cache key
+        id: cache-key
+        run: |
+          ARCH="$(uname -m)"
+          echo "key=php-bins-${{ matrix.version }}-${{ matrix.type }}-${{ matrix.distro }}-${ARCH}-${{ steps.pull-image.outputs.image_hash }}" >> "${GITHUB_OUTPUT}"
+      - name: Cache PHP binaries
+        uses: actions/cache@v4
+        with:
+          path: php-cache
+          key: ${{ steps.cache-key.outputs.key }}
+          restore-keys: |
+            php-bins-${{ matrix.version }}-${{ matrix.type }}-${{ matrix.distro }}-
+      - name: Build container
+        run: |
+          if test -d "php-cache"; then
+            echo "Found cached PHP binaries"
+          else
+            mkdir -p "php-cache"
+          fi
+          docker compose build --no-cache --build-arg IMAGE="php" --build-arg TAG="${{ matrix.version }}-${{ matrix.type }}-${{ matrix.distro }}"
+      - name: Test extension with Bundled PHP
+        run: docker compose run --rm -v "$(pwd)/php-cache:/opt/php-cache" -e PHP_CACHE_DIR="/opt/php-cache" -e GITHUB_ACTIONS="true" -e CONTAINER_IMAGE_HASH="${{ steps.pull-image.outputs.image_hash }}" shell pskel test
+      - name: Test extension with PHP Debug Build
+        if: matrix.version != '8.1'
+        run: docker compose run --rm -v "$(pwd)/php-cache:/opt/php-cache" -e PHP_CACHE_DIR="/opt/php-cache" -e GITHUB_ACTIONS="true" -e CONTAINER_IMAGE_HASH="${{ steps.pull-image.outputs.image_hash }}" shell pskel test debug
+      - name: Test extension with Valgrind
+        if: matrix.version != '8.1'
+        run: docker compose run --rm -v "$(pwd)/php-cache:/opt/php-cache" -e PHP_CACHE_DIR="/opt/php-cache" -e GITHUB_ACTIONS="true" -e CONTAINER_IMAGE_HASH="${{ steps.pull-image.outputs.image_hash }}" shell pskel test valgrind
+      - name: Test extension with LLVM Sanitizer (MemorySanitizer)
+        if: matrix.distro != 'alpine' && matrix.version != '8.1'
+        run: docker compose run --rm -v "$(pwd)/php-cache:/opt/php-cache" -e PHP_CACHE_DIR="/opt/php-cache" -e GITHUB_ACTIONS="true" -e CONTAINER_IMAGE_HASH="${{ steps.pull-image.outputs.image_hash }}" shell pskel test msan
+      - name: Test extension with LLVM Sanitizer (AddressSanitizer)
+        if: matrix.distro != 'alpine' && matrix.version != '8.1'
+        run: docker compose run --rm -v "$(pwd)/php-cache:/opt/php-cache" -e PHP_CACHE_DIR="/opt/php-cache" -e GITHUB_ACTIONS="true" -e CONTAINER_IMAGE_HASH="${{ steps.pull-image.outputs.image_hash }}" shell pskel test asan
+      - name: Test extension with LLVM Sanitizer (UndefinedBehaviorSanitizer)
+        if: matrix.distro != 'alpine' && matrix.version != '8.1'
+        run: docker compose run --rm -v "$(pwd)/php-cache:/opt/php-cache" -e PHP_CACHE_DIR="/opt/php-cache" -e GITHUB_ACTIONS="true" -e CONTAINER_IMAGE_HASH="${{ steps.pull-image.outputs.image_hash }}" shell pskel test ubsan

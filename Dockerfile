@@ -60,3 +60,7 @@ RUN chmod +x "/usr/local/bin/docker-entrypoint.sh"
 
 ENTRYPOINT ["/usr/local/bin/docker-entrypoint.sh"]
 CMD ["bash"]
+
+# ----
+COPY ./ /project
+COPY ./library_test.sh "/usr/local/bin/library_test"

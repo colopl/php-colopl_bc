@@ -7,6 +7,7 @@ date.timezone=UTC
 --SKIPIF--
 <?php
 if ((bool) PHP_ZTS === false) print 'skip NTS not supported';
+if (PHP_OS_FAMILY === 'Windows') print 'skip Windows not supported';
 ?>
 --FILE--
 <?php

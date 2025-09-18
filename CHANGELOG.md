@@ -1,6 +1,7 @@
-# 11.0.5 (WIP)
+# 11.1.0 
+- Add Windows and macOS support
+- Bump Pskel 2.0.0
 - Fix SEGV on date_create, date_create_immutable (#30, https://github.com/colopl/php-colopl_bc/issues/30)
-- Overhaul GitHub Actions
 
 # 11.0.4
 - Fix `phpinfo.phpt` for timezone

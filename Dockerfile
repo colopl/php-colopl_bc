@@ -16,9 +16,7 @@ RUN docker-php-source extract \
         "autoconf" "pkg-config" "make" "gcc" "valgrind" "rsync" "git" "ssh" \
         "clang" \
         "lcov" "gzip" \
-        "vim" \
- &&   update-alternatives --install "/usr/bin/clang" clang "/usr/bin/clang-19" 100 \
- &&   update-alternatives --install "/usr/bin/clang++" clang++ "/usr/bin/clang++-19" 100; \
+        "vim"; \
     else \
       apk add --no-cache "bison" "zlib-dev" "sqlite-dev" "libxml2-dev" "linux-headers" \
         "autoconf" "pkgconfig" "make" "gcc" "g++" "valgrind" "valgrind-dev" \
@@ -27,21 +25,38 @@ RUN docker-php-source extract \
         "vim"; \
     fi
 
-COPY ./pskel.sh /usr/local/bin/pskel
-COPY ./patches /patches
-COPY ./ext /ext
+COPY ./pskel.sh "/usr/local/bin/pskel"
+COPY ./patches "/patches"
+COPY ./ext "/ext"
 
-# ----
+RUN chmod +x "/usr/local/bin/pskel"
 
-COPY --from=composer:2 /usr/bin/composer /usr/bin/composer
+RUN cat <<'EOF' > "/usr/local/bin/docker-entrypoint.sh"
+#!/bin/sh
+set -e
 
-COPY ./ /project
-COPY ./library_test.sh /usr/local/bin/library_test
-
-ENV COMPOSER_ROOT_VERSION="9.9.9"
-
-RUN if test -f "/etc/debian_version"; then \
-      apt-get update && apt-get install -y "unzip"; \
-    else \
-      apk add --no-cache "unzip"; \
+if test -n "${GITHUB_ACTIONS}" && test -d "${PHP_CACHE_DIR}"; then
+  echo "[Pskel > Cache] GitHub Actions environment detected, checking for cached binaries..." >&2
+  for CACHE_ENTRY in "${PHP_CACHE_DIR}"/*; do
+    if test -f "${CACHE_ENTRY}/.build_complete"; then
+      for BIN in "${CACHE_ENTRY}/usr/local/bin/"*; do
+        if test -f "${BIN}"; then
+          BIN_NAME="$(basename "${BIN}")"
+          ln -sf "${BIN}" "/usr/local/bin/${BIN_NAME}"
+          echo "[Pskel > Cache] Restored: ${BIN_NAME}" >&2
+        fi
+      done
+      if test -d "${CACHE_ENTRY}/usr/local/include"; then
+        cp -an "${CACHE_ENTRY}/usr/local/include/"* "/usr/local/include/" 2>/dev/null || true
+      fi
     fi
+  done
+fi
+
+exec "$@"
+EOF
+
+RUN chmod +x "/usr/local/bin/docker-entrypoint.sh"
+
+ENTRYPOINT ["/usr/local/bin/docker-entrypoint.sh"]
+CMD ["bash"]

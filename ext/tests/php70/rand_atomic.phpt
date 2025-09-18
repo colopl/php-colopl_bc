@@ -7,6 +7,7 @@ date.timezone=UTC
 --SKIPIF--
 <?php
 if (PHP_INT_SIZE !== 8) die("skip this test is for 64bit platform only");
+if (PHP_OS_FAMILY === 'Windows') print 'skip Windows not supported';
 ?>
 --FILE--
 <?php
@@ -22,7 +23,7 @@ foreach (scandir((realpath(__DIR__.'/data'))) as $env_dump_file) {
         pathinfo($env_dump_file, PATHINFO_FILENAME),
         $matches
     );
-    
+
     [$file_name, $php_version, $kernel_type, $seed, $count, $min, $max] = $matches;
 
     echo "Checking: {$file_name}...";

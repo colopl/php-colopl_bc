@@ -31,7 +31,7 @@
 #if defined(__clang__)
 __attribute__((no_sanitize("signed-integer-overflow")))
 #endif
-PHPAPI void php_colopl_bc_srand(zend_long seed)
+void php_colopl_bc_srand(zend_long seed)
 {
 #ifdef ZTS
 	COLOPL_BC_G(rand_seed) = (uint32_t) seed;
@@ -65,7 +65,7 @@ PHPAPI void php_colopl_bc_srand(zend_long seed)
 #if defined(__clang__)
 __attribute__((no_sanitize("signed-integer-overflow")))
 #endif
-PHPAPI zend_long php_colopl_bc_rand(void)
+zend_long php_colopl_bc_rand(void)
 {
 	zend_long ret;
 
@@ -172,7 +172,7 @@ static inline void mt_reload(void)
 	COLOPL_BC_G(mt_next) = state;
 }
 
-PHPAPI void php_colopl_bc_mt_srand(uint32_t seed)
+void php_colopl_bc_mt_srand(uint32_t seed)
 {
 	mt_initialize(seed, COLOPL_BC_G(mt_state));
 	mt_reload();
@@ -180,7 +180,7 @@ PHPAPI void php_colopl_bc_mt_srand(uint32_t seed)
 	COLOPL_BC_G(mt_rand_is_seeded) = 1;
 }
 
-PHPAPI uint32_t php_colopl_bc_mt_rand(void)
+uint32_t php_colopl_bc_mt_rand(void)
 {
 	register uint32_t s1;
 
@@ -253,7 +253,7 @@ PHP_FUNCTION(Colopl_ColoplBc_Php70_mt_getrandmax)
 /* array.c */
 
 #if PHP_VERSION_ID < 80200
-PHPAPI void php_colopl_bc_array_data_shuffle(zval *array)
+void php_colopl_bc_array_data_shuffle(zval *array)
 {
 	uint32_t idx, j, n_elems;
 	Bucket *p, temp;
@@ -337,7 +337,7 @@ PHPAPI void php_colopl_bc_array_data_shuffle(zval *array)
 	HANDLE_UNBLOCK_INTERRUPTIONS();
 }
 #else
-PHPAPI void php_colopl_bc_array_data_shuffle(zval *array)
+void php_colopl_bc_array_data_shuffle(zval *array)
 {
 	int64_t idx, j, n_elems, rnd_idx, n_left;
 	zval *zv, temp;
@@ -494,7 +494,7 @@ PHP_FUNCTION(Colopl_ColoplBc_Php70_array_rand)
 }
 
 /* string.c */
-PHPAPI void php_colopl_bc_string_shuffle(char *str, zend_long len)
+void php_colopl_bc_string_shuffle(char *str, zend_long len)
 {
 	zend_long n_elems, rnd_idx, n_left;
 	char temp;

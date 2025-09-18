@@ -62,5 +62,6 @@ ENTRYPOINT ["/usr/local/bin/docker-entrypoint.sh"]
 CMD ["bash"]
 
 # ----
-COPY ./ /project
+COPY --from=composer:2 "/usr/bin/composer" "/usr/local/bin/composer"
+COPY ./ "/project"
 COPY ./library_test.sh "/usr/local/bin/library_test"

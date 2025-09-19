@@ -2,6 +2,8 @@ name: Coverage
 permissions:
   contents: write
   pull-requests: write
+  pages: write
+  id-token: write
 on:
   push:
     branches:
@@ -12,72 +14,127 @@ on:
       - synchronize
       - reopened
 jobs:
-  Linux:
-    strategy:
-      matrix:
-        runs-on: ['ubuntu-24.04', 'ubuntu-24.04-arm']
-        version: ['8.4']
-        type: ['cli', 'zts']
-        distro: ['trixie']
-    runs-on: ${{ matrix.runs-on }}
+  init:
+    runs-on: ubuntu-24.04
+    outputs:
+      needs-init: ${{ steps.check.outputs.needs-init }}
     steps:
       - name: Checkout
         uses: actions/checkout@v5
         with:
           submodules: true
-      - name: Setup buildx
-        uses: docker/setup-buildx-action@v3
-      - name: Build container
+      - name: Check if initialization is needed
+        id: check
         run: |
-          docker compose build --pull --no-cache --build-arg IMAGE="php" --build-arg TAG="${{ matrix.version }}-${{ matrix.type }}-${{ matrix.distro }}"
-      - name: Test with gcov
+          if test -f "ext/.gitkeep" && test "$(cat "ext/.gitkeep")" = "pskel_uninitialized"; then
+            echo "needs-init=true" >> $GITHUB_OUTPUT
+          else
+            echo "needs-init=false" >> $GITHUB_OUTPUT
+          fi
+      - name: Initialize extension
+        if: steps.check.outputs.needs-init == 'true'
         run: |
-          docker compose run -v "$(pwd)/ext:/ext" --rm shell pskel coverage
-      - name: Upload coverage to artifact
+          docker compose run -v "$(pwd)/ext:/ext" --rm shell pskel init skeleton
+      - name: Upload initialized extension
+        if: steps.check.outputs.needs-init == 'true'
         uses: actions/upload-artifact@v4
         with:
-          name: coverage-${{ matrix.runs-on }}-${{ matrix.version }}-${{ matrix.type }}-${{ matrix.distro }}
-          path: ${{ github.workspace }}/ext/lcov.info
-  Coverage:
-    needs: [Linux]
-    runs-on: ubuntu-latest
+          name: initialized-ext-coverage
+          path: ext/
+          retention-days: 1
+  coverage:
+    needs: init
+    runs-on: ${{ matrix.platform }}
+    strategy:
+      matrix:
+        versions: ['8.4']
+        platform: ['ubuntu-24.04', 'ubuntu-24.04-arm']
+        ts: ['cli', 'zts']
     steps:
       - name: Checkout
         uses: actions/checkout@v5
-      - name: Download coverage artifacts
+        with:
+          submodules: true
+      - name: Download initialized extension
+        if: needs.init.outputs.needs-init == 'true'
         uses: actions/download-artifact@v5
         with:
-          path: coverage-artifacts
+          name: initialized-ext-coverage
+          path: ext/
       - name: Install lcov
-        run: sudo apt-get install -y lcov
-      - name: Merge coverages
         run: |
-          LCOV_FILES=$(find coverage-artifacts -name "lcov.info" -type f)
-
-          if [ -z "${LCOV_FILES}" ]; then
-            echo "No lcov.info files found in the artifacts!"
-            exit 1
-          fi
-
-          CMD="$(which "lcov")"
-          CMD+=" --ignore-errors format"
-          for LCOV_FILE in ${LCOV_FILES}; do
-            echo "Adding coverage file: ${LCOV_FILE}"
-            CMD+=" -a ${LCOV_FILE}"
-          done
-          CMD+=" -o lcov.info"
-
-          echo "Executing: `${CMD}`"
-          eval "${CMD}"
-
-          if [ ! -f "lcov.info" ]; then
-            echo "Failed to generate merged lcov.info file!"
-            exit 1
-          fi
-
-          echo "Successfully merged $(echo "${LCOV_FILES}" | wc -w) coverage files."
-      - name: Report coverage
-        uses: k1LoW/octocov-action@v1
+          sudo apt-get update
+          sudo apt-get install -y "lcov"
+      - name: Build container and run coverage
+        run: |
+          docker compose build \
+            --build-arg TAG="${{ matrix.versions }}-${{ matrix.ts }}" \
+            shell
+          touch "lcov.info"
+          docker compose run -v "$(pwd)/lcov.info:/ext/lcov.info" --rm shell pskel coverage
+          mv "lcov.info" "${{ matrix.platform }}_${{ matrix.versions }}_${{ matrix.ts }}_lcov.info"
+      - name: Upload coverage artifact
+        uses: actions/upload-artifact@v4
         with:
-          github-token: ${{ secrets.GITHUB_TOKEN }}
+          name: coverage-${{ matrix.platform }}-${{ matrix.versions }}-${{ matrix.ts }}
+          path: "${{ matrix.platform }}_${{ matrix.versions }}_${{ matrix.ts }}_lcov.info"
+          retention-days: 1
+  deploy-pages:
+    needs: [coverage, init]
+    runs-on: ubuntu-24.04
+    if: github.ref == 'refs/heads/main'
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+      - name: Install lcov
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y "lcov"
+      - name: Download all coverage artifacts
+        uses: actions/download-artifact@v5
+        with:
+          pattern: coverage-*
+          merge-multiple: true
+          path: coverage-files/
+      - name: Merge coverage files
+        run: |
+          COVERAGE_FILES=$(find "coverage-files/" -name "*_lcov.info" -type f)
+          if test -z "${COVERAGE_FILES}"; then
+            echo "No coverage files found"
+            exit 1
+          fi
+
+          TRACEFILE_ARGS=""
+          for FILE in ${COVERAGE_FILES}; do
+            TRACEFILE_ARGS="${TRACEFILE_ARGS} --add-tracefile ${FILE}"
+          done
+
+          lcov ${TRACEFILE_ARGS} --ignore-errors format --output-file "lcov.info"
+      - name: Download initialized extension
+        if: needs.init.outputs.needs-init == 'true'
+        uses: actions/download-artifact@v5
+        with:
+          name: initialized-ext-coverage
+          path: ext/
+      - name: Generate HTML coverage report
+        run: |
+          mkdir -p "coverage-html"
+          sudo mv "ext" "/"
+          sudo chmod -R +r "/ext"
+          genhtml --output-directory "coverage-html" --title "Coverage Report" "lcov.info"
+      - name: Run octocov
+        uses: k1LoW/octocov-action@73d561f65d59e66899ed5c87e4621a913b5d5c20
+        with:
           config: .github/octocov.yml
+      - name: Setup Pages
+        uses: actions/configure-pages@v5
+      - name: Upload Pages artifact
+        uses: actions/upload-pages-artifact@v4
+        with:
+          path: coverage-html/
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4

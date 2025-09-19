@@ -6,7 +6,8 @@ colopl_bc
 date.timezone=UTC
 --SKIPIF--
 <?php
-if ((bool) PHP_ZTS === true) print 'skip ZTS not supported'; 
+if ((bool) PHP_ZTS === true) print 'skip ZTS not supported';
+if (PHP_OS_FAMILY === 'Windows') print 'skip Windows not supported';
 ?>
 --FILE--
 <?php

@@ -194,7 +194,7 @@ static int legacy_compare_slow(zval *op1, zval *op2)
 	return bc;
 }
 
-PHPAPI PHP_INI_MH(OnUpdateCompareMode)
+PHP_INI_MH(OnUpdateCompareMode)
 {
 	if (OnUpdateLong(entry, new_value, mh_arg1, mh_arg2, mh_arg3, stage) == FAILURE) {
 		return FAILURE;
@@ -209,7 +209,7 @@ PHPAPI PHP_INI_MH(OnUpdateCompareMode)
 	return SUCCESS;
 }
 
-PHPAPI int php_colopl_bc_compare(zval *op1, zval *op2)
+int php_colopl_bc_compare(zval *op1, zval *op2)
 {
 	return COLOPL_BC_G(php74_compare_func)(op1, op2);
 }
@@ -768,7 +768,7 @@ static bucket_compare_func_t php_colopl_bc_get_data_compare_func(zend_long sort_
 #define COLOPL_BC_MULTISORT_TYPE	1
 #define COLOPL_BC_MULTISORT_LAST	2
 
-PHPAPI int php_colopl_bc_multisort_compare(const void *a, const void *b)
+int php_colopl_bc_multisort_compare(const void *a, const void *b)
 {
 	Bucket *ab = *(Bucket **)a;
 	Bucket *bb = *(Bucket **)b;
@@ -960,7 +960,7 @@ static void legacy_hash_sort_slow(INTERNAL_FUNCTION_PARAMETERS, zval *array, buc
 	ZVAL_ARR(array, Z_ARRVAL(legacy));
 }
 
-PHPAPI PHP_INI_MH(OnUpdateSortMode)
+PHP_INI_MH(OnUpdateSortMode)
 {
 	if (OnUpdateLong(entry, new_value, mh_arg1, mh_arg2, mh_arg3, stage) == FAILURE) {
 		return FAILURE;

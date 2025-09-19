@@ -1,0 +1,85 @@
+name: CI Windows
+on:
+  workflow_call:
+jobs:
+  init:
+    runs-on: ubuntu-24.04
+    outputs:
+      needs-init: ${{ steps.check.outputs.needs-init }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+        with:
+          submodules: true
+      - name: Check if initialization is needed
+        id: check
+        run: |
+          if test -f "ext/.gitkeep" && test "$(cat "ext/.gitkeep")" = "pskel_uninitialized"; then
+            echo "needs-init=true" >> $GITHUB_OUTPUT
+          else
+            echo "needs-init=false" >> $GITHUB_OUTPUT
+          fi
+      - name: Initialize extension
+        if: steps.check.outputs.needs-init == 'true'
+        run: |
+          docker compose run -v"$(pwd)/ext:/ext" --rm shell pskel init example
+      - name: Upload initialized extension
+        if: steps.check.outputs.needs-init == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: initialized-ext-windows
+          path: ext/
+          retention-days: 1
+  Windows:
+    needs: init
+    runs-on: ${{ matrix.runs-on }}
+    strategy:
+      matrix:
+        runs-on:
+          - windows-2022
+          - windows-2025
+        version: ['8.1', '8.2', '8.3', '8.4']
+        arch: ['x64', 'x86']
+        ts: ['ts', 'nts']
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+        with:
+          submodules: true
+      - name: Download initialized extension
+        if: needs.init.outputs.needs-init == 'true'
+        uses: actions/download-artifact@v5
+        with:
+          name: initialized-ext-windows
+          path: ext\
+      - name: Extract extension name
+        id: ext-name
+        shell: pwsh
+        run: |
+          $name = (Get-Content .\ext\config.w32 | Select-String "EXTENSION\('([^']+)'" | ForEach-Object { $_.Matches[0].Groups[1].Value })
+          echo "name=$name" >> $env:GITHUB_OUTPUT
+      - name: Setup PHP
+        id: setup-php
+        uses: php/setup-php-sdk@aeb631f88f71bbf027937e7f7b1553e1d394c99e # v0.10
+        with:
+          version: ${{ matrix.version }}
+          arch: ${{ matrix.arch }}
+          ts: ${{ matrix.ts }}
+          cache: true
+      - name: Enable Developer Command Prompt
+        uses: ilammy/msvc-dev-cmd@0b201ec74fa43914dc39ae48a89fd1d8cb592756 # v1.13.0
+        with:
+          arch: ${{ matrix.arch }}
+          toolset: ${{ steps.setup-php.outputs.toolset }}
+      - name: phpize and configure
+        run: |
+          cd "ext"
+          phpize
+          ./configure.bat --enable-${{ steps.ext-name.outputs.name }} --with-prefix=${{ steps.setup-php.outputs.prefix }}
+      - name: Build and Test
+        env:
+          TEST_PHP_ARGS: '-q --show-diff'
+        run: |
+          cd "ext"
+          nmake
+          nmake test

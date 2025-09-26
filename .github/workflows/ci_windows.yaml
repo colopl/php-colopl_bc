@@ -60,7 +60,7 @@ jobs:
           echo "name=$name" >> $env:GITHUB_OUTPUT
       - name: Setup PHP
         id: setup-php
-        uses: php/setup-php-sdk@aeb631f88f71bbf027937e7f7b1553e1d394c99e # v0.10
+        uses: php/setup-php-sdk@474d4e386703a8bf269c41661c6b934a751a61bf # v0.11
         with:
           version: ${{ matrix.version }}
           arch: ${{ matrix.arch }}

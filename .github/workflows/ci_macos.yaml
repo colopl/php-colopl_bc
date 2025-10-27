@@ -25,7 +25,7 @@ jobs:
           docker compose run -v"$(pwd)/ext:/ext" --rm shell pskel init example
       - name: Upload initialized extension
         if: steps.check.outputs.needs-init == 'true'
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         with:
           name: initialized-ext-macos
           path: ext/

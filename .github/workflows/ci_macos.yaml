@@ -52,7 +52,7 @@ jobs:
           submodules: true
       - name: Download initialized extension
         if: needs.init.outputs.needs-init == 'true'
-        uses: actions/download-artifact@v5
+        uses: actions/download-artifact@v6
         with:
           name: initialized-ext-macos
           path: ext/

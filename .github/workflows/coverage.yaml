@@ -57,7 +57,7 @@ jobs:
           submodules: true
       - name: Download initialized extension
         if: needs.init.outputs.needs-init == 'true'
-        uses: actions/download-artifact@v5
+        uses: actions/download-artifact@v6
         with:
           name: initialized-ext-coverage
           path: ext/
@@ -94,7 +94,7 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y "lcov"
       - name: Download all coverage artifacts
-        uses: actions/download-artifact@v5
+        uses: actions/download-artifact@v6
         with:
           pattern: coverage-*
           merge-multiple: true
@@ -115,7 +115,7 @@ jobs:
           lcov ${TRACEFILE_ARGS} --ignore-errors format --output-file "lcov.info"
       - name: Download initialized extension
         if: needs.init.outputs.needs-init == 'true'
-        uses: actions/download-artifact@v5
+        uses: actions/download-artifact@v6
         with:
           name: initialized-ext-coverage
           path: ext/

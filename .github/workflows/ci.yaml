@@ -5,16 +5,51 @@ on:
         - main
   pull_request:
   workflow_dispatch:
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref_name || github.run_id }}
+  cancel-in-progress: true
 permissions:
+  actions: read
   contents: write
   packages: write
+  pages: write
+  id-token: write
   pull-requests: write
 jobs:
+  Prepare:
+    uses: ./.github/workflows/ci_prepare.yaml
   Linux_Native:
+    needs: Prepare
     uses: ./.github/workflows/ci_native_linux.yaml
+    with:
+      artifact_name: ${{ needs.Prepare.outputs.artifact_name }}
+      artifact_run_id: ${{ needs.Prepare.outputs.artifact_run_id }}
+      archive_name: ${{ needs.Prepare.outputs.archive_name }}
   Linux_Emulated:
+    needs: Prepare
     uses: ./.github/workflows/ci_emulated_linux.yaml
+    with:
+      artifact_name: ${{ needs.Prepare.outputs.artifact_name }}
+      artifact_run_id: ${{ needs.Prepare.outputs.artifact_run_id }}
+      archive_name: ${{ needs.Prepare.outputs.archive_name }}
   macOS:
+    needs: Prepare
     uses: ./.github/workflows/ci_macos.yaml
+    with:
+      artifact_name: ${{ needs.Prepare.outputs.artifact_name }}
+      artifact_run_id: ${{ needs.Prepare.outputs.artifact_run_id }}
+      archive_name: ${{ needs.Prepare.outputs.archive_name }}
   Windows:
+    needs: Prepare
     uses: ./.github/workflows/ci_windows.yaml
+    with:
+      artifact_name: ${{ needs.Prepare.outputs.artifact_name }}
+      artifact_run_id: ${{ needs.Prepare.outputs.artifact_run_id }}
+      archive_name: ${{ needs.Prepare.outputs.archive_name }}
+  Coverage:
+    needs: Prepare
+    uses: ./.github/workflows/ci_coverage.yaml
+    with:
+      artifact_name: ${{ needs.Prepare.outputs.artifact_name }}
+      artifact_run_id: ${{ needs.Prepare.outputs.artifact_run_id }}
+      archive_name: ${{ needs.Prepare.outputs.archive_name }}

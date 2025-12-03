@@ -1,78 +1,97 @@
 name: CI Emulated Linux
 on:
   workflow_call:
+    inputs:
+      artifact_name:
+        required: true
+        type: string
+      artifact_run_id:
+        required: true
+        type: string
+      archive_name:
+        required: true
+        type: string
 jobs:
   Linux:
     runs-on: ubuntu-24.04
     strategy:
       matrix:
         platform: ['linux/s390x']
-        version: ['8.1', '8.2', '8.3', '8.4']
+        version: ['8.1', '8.2', '8.3', '8.4', '8.5']
         type: ['cli', 'zts']
         distro: ['trixie', 'alpine']
     steps:
-        - name: Checkout
-          uses: actions/checkout@v6
-          with:
-            submodules: true
-        - name: Setup QEMU
-          uses: docker/setup-qemu-action@c7c53464625b32c7a7e944ae62b3e17d2b600130 # v3.7.0
-          with:
-            platforms: "s390x"
-            cache-image: false
-        - name: Setup Docker layer caching
-          uses: docker/setup-buildx-action@e468171a9de216ec08956ac3ada2f0791b6bd435 # v3.11.1
-          with:
-            driver-opts: |
-              image=moby/buildkit:latest
-            buildkitd-flags: --debug
-        - name: Login to GitHub Container Registry
-          if: github.event_name != 'pull_request'
-          uses: docker/login-action@5e57cd118135c172c3672efd75eb46360885c0ef # v3.6.0
-          with:
-            registry: ghcr.io
-            username: ${{ github.actor }}
-            password: ${{ secrets.GITHUB_TOKEN }}
-        - name: Pull PHP container image
-          run: |
-            docker pull --platform "${{ matrix.platform }}" "php:${{ matrix.version }}-${{ matrix.type }}-${{ matrix.distro }}"
-        - name: Cut arch name
-          id: cut-arch
-          run: echo "arch=$(echo "${{ matrix.platform }}" | sed 's|linux/||')" >> $GITHUB_OUTPUT
-        - name: Generate image tag
-          id: image-tag
-          run: |
-            TAG="ghcr.io/${{ github.repository }}/ci-emulated-cache:${{ steps.cut-arch.outputs.arch }}-${{ matrix.version }}-${{ matrix.type }}-${{ matrix.distro }}-${{ hashFiles('**/Dockerfile', '**/compose.yaml', '**/pskel.sh') }}"
-            echo "tag=${TAG}" >> $GITHUB_OUTPUT
-        - name: Check if image exists
-          id: check-image
-          run: |
-            if docker manifest inspect "${{ steps.image-tag.outputs.tag }}" >/dev/null 2>&1; then
-              echo "exists=true" >> $GITHUB_OUTPUT
-              echo "Image already exists, will reuse: ${{ steps.image-tag.outputs.tag }}"
-            else
-              echo "exists=false" >> $GITHUB_OUTPUT
-              echo "Image does not exist, will build: ${{ steps.image-tag.outputs.tag }}"
-            fi
-        - name: Build container
-          if: steps.check-image.outputs.exists == 'false'
-          run: |
-            docker compose build \
-              --build-arg PLATFORM="${{ matrix.platform }}" \
-              --build-arg TAG="${{ matrix.version }}-${{ matrix.type }}-${{ matrix.distro }}" \
-              shell
-            docker tag shell "${{ steps.image-tag.outputs.tag }}"
-        - name: Push image to GitHub Container Registry
-          if: steps.check-image.outputs.exists == 'false' && github.event_name != 'pull_request'
-          run: |
-            docker push "${{ steps.image-tag.outputs.tag }}"
-        - name: Pull existing image
-          if: steps.check-image.outputs.exists == 'true'
-          run: |
-            docker pull "${{ steps.image-tag.outputs.tag }}"
-        - name: Test extension with Bundled PHP
-          run: |
-            if test "${{ steps.check-image.outputs.exists }}" = "true"; then
-              export SHELL_IMAGE="${{ steps.image-tag.outputs.tag }}"
-            fi
-            docker compose run --rm shell pskel test
+      - name: Download prepared workspace
+        uses: actions/download-artifact@v6
+        with:
+          name: ${{ inputs.artifact_name }}
+          path: ${{ runner.temp }}/source-archive
+      - name: Extract prepared workspace
+        env:
+          ARCHIVE_NAME: ${{ inputs.archive_name }}
+        run: |
+          ARCHIVE_PATH="${RUNNER_TEMP}/source-archive/${ARCHIVE_NAME}"
+          tar -xzf "${ARCHIVE_PATH}" --strip-components=1 -C "${GITHUB_WORKSPACE}"
+          rm -f "${ARCHIVE_PATH}"
+      - name: Setup QEMU
+        uses: docker/setup-qemu-action@c7c53464625b32c7a7e944ae62b3e17d2b600130 # v3.7.0
+        with:
+          platforms: "s390x"
+          cache-image: false
+      - name: Setup Docker layer caching
+        uses: docker/setup-buildx-action@e468171a9de216ec08956ac3ada2f0791b6bd435 # v3.11.1
+        with:
+          driver-opts: |
+            image=moby/buildkit:latest
+          buildkitd-flags: --debug
+      - name: Login to GitHub Container Registry
+        if: github.event_name != 'pull_request'
+        uses: docker/login-action@5e57cd118135c172c3672efd75eb46360885c0ef # v3.6.0
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Pull PHP container image
+        run: |
+          docker pull --platform "${{ matrix.platform }}" "php:${{ matrix.version }}-${{ matrix.type }}-${{ matrix.distro }}"
+      - name: Cut arch name
+        id: cut-arch
+        run: echo "arch=$(echo "${{ matrix.platform }}" | sed 's|linux/||')" >> $GITHUB_OUTPUT
+      - name: Generate image tag
+        id: image-tag
+        run: |
+          TAG="ghcr.io/${{ github.repository }}/ci-emulated-cache:${{ steps.cut-arch.outputs.arch }}-${{ matrix.version }}-${{ matrix.type }}-${{ matrix.distro }}-${{ hashFiles('**/Dockerfile', '**/compose.yaml', '**/pskel.sh') }}"
+          echo "tag=${TAG}" >> $GITHUB_OUTPUT
+      - name: Check if image exists
+        id: check-image
+        run: |
+          if docker manifest inspect "${{ steps.image-tag.outputs.tag }}" >/dev/null 2>&1; then
+            echo "exists=true" >> $GITHUB_OUTPUT
+            echo "Image already exists, will reuse: ${{ steps.image-tag.outputs.tag }}"
+          else
+            echo "exists=false" >> $GITHUB_OUTPUT
+            echo "Image does not exist, will build: ${{ steps.image-tag.outputs.tag }}"
+          fi
+      - name: Build container
+        if: steps.check-image.outputs.exists == 'false'
+        run: |
+          docker compose build \
+            --build-arg PLATFORM="${{ matrix.platform }}" \
+            --build-arg TAG="${{ matrix.version }}-${{ matrix.type }}-${{ matrix.distro }}" \
+            --build-arg SKIP_VALGRIND=1 \
+            shell
+          docker tag shell "${{ steps.image-tag.outputs.tag }}"
+      - name: Push image to GitHub Container Registry
+        if: steps.check-image.outputs.exists == 'false' && github.event_name != 'pull_request'
+        run: |
+          docker push "${{ steps.image-tag.outputs.tag }}"
+      - name: Pull existing image
+        if: steps.check-image.outputs.exists == 'true'
+        run: |
+          docker pull "${{ steps.image-tag.outputs.tag }}"
+      - name: Test extension with Bundled PHP
+        run: |
+          if test "${{ steps.check-image.outputs.exists }}" = "true"; then
+            export SHELL_IMAGE="${{ steps.image-tag.outputs.tag }}"
+          fi
+          docker compose run --rm shell pskel test

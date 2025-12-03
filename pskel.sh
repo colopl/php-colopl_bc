@@ -45,11 +45,21 @@ EOF
       ;;
   esac
 
+  mkdir -p "/tmp/pskel_extension_tmp"
+  if test "$(/usr/local/bin/php -r 'echo PHP_VERSION_ID;')" -lt "80500"; then
+    /usr/local/bin/php "/usr/src/php/ext/ext_skel.php" --ext "${1}" --dir "/tmp/pskel_extension_tmp" "${@}"
+  else
+    if test -z "${2}"; then
+      EXT_VENDOR="pskel"
+    else
+      EXT_VENDOR="${2}"
+    fi
+    /usr/local/bin/php "/usr/src/php/ext/ext_skel.php" --vendor "${EXT_VENDOR}" --ext "${1}" --dir "/tmp/pskel_extension_tmp" "${@}"
+  fi
   PSKEL_EXT_DIR="$(get_ext_dir --no-init)"
-  /usr/local/bin/php "/usr/src/php/ext/ext_skel.php" --ext "${1}" --dir "/tmp" "${@}"
-  rm "${PSKEL_EXT_DIR}/.gitkeep"
-  rsync -av "/tmp/${1}/" "${PSKEL_EXT_DIR}/"
-  rm -rf "/tmp/${1}"
+  rm -rf "/tmp/pskel_extension_tmp/${1}/.gitkeep"
+  rsync -av "/tmp/pskel_extension_tmp/${1}/" "${PSKEL_EXT_DIR}/"
+  rm -rf "${PSKEL_EXT_DIR}/.gitkeep"
 }
 
 cmd_test() {
@@ -69,12 +79,12 @@ EOF
       case "${1}" in
         debug) build_php_if_not_exists "debug";;
         gcov)
-          CONFIGURE_OPTS="--enable-gcov"
+          CONFIGURE_OPTS="${CONFIGURE_OPTS} --enable-gcov"
           build_php_if_not_exists "gcov"
           CFLAGS="${CFLAGS} --coverage"
           ;;
         valgrind)
-          CONFIGURE_OPTS="--with-valgrind"
+          CONFIGURE_OPTS="${CONFIGURE_OPTS} --with-valgrind"
           build_php_if_not_exists "valgrind"
           TEST_PHP_ARGS="${TEST_PHP_ARGS} -m"
           ;;
@@ -86,19 +96,19 @@ EOF
       CXX="$(command -v "clang++")"
       case "${1}" in
         msan)
-          CONFIGURE_OPTS="--enable-memory-sanitizer"
+          CONFIGURE_OPTS="${CONFIGURE_OPTS} --enable-memory-sanitizer"
           build_php_if_not_exists "msan"
           CFLAGS="${CFLAGS} -fsanitize=memory"
           LDFLAGS="${LDFLAGS} -fsanitize=memory"
           ;;
         asan)
-          CONFIGURE_OPTS="--enable-address-sanitizer"
+          CONFIGURE_OPTS="${CONFIGURE_OPTS} --enable-address-sanitizer"
           build_php_if_not_exists "asan"
           CFLAGS="${CFLAGS} -fsanitize=address"
           LDFLAGS="${LDFLAGS} -fsanitize=address"
           ;;
         ubsan)
-          CONFIGURE_OPTS="--enable-undefined-sanitizer"
+          CONFIGURE_OPTS="${CONFIGURE_OPTS} --enable-undefined-sanitizer"
           build_php_if_not_exists "ubsan"
           CFLAGS="${CFLAGS} -fsanitize=undefined"
           LDFLAGS="${LDFLAGS} -fsanitize=undefined"
@@ -151,7 +161,7 @@ build_php_if_not_exists() {
     CFLAGS="-DZEND_TRACK_ARENA_ALLOC" \
     CPPFLAGS="${CFLAGS}" \
     LDFLAGS="${LDFLAGS}" \
-    CONFIGURE_OPTS="${CONFIGURE_OPTS} --enable-debug $(php -r "echo PHP_ZTS === 1 ? '--enable-zts' : '';") --enable-option-checking=fatal --disable-phpdbg --disable-cgi --disable-fpm --enable-cli --without-pcre-jit --disable-opcache-jit --disable-zend-max-execution-timers" \
+    CONFIGURE_OPTS="${CONFIGURE_OPTS} --enable-debug $(php -r "echo (bool)PHP_ZTS ? '--enable-zts' : '';") --enable-option-checking=fatal --disable-phpdbg --disable-cgi --disable-fpm --enable-cli --without-pcre-jit --disable-opcache-jit --disable-zend-max-execution-timers" \
     cmd_build "${PREFIX}"
 
     if test -n "${GITHUB_ACTIONS}" && test -d "${PHP_CACHE_DIR}"; then
@@ -193,7 +203,7 @@ generate_cache_key() {
   COMPILER="${2}"
 
   PHP_VERSION="$(php -r 'echo PHP_VERSION;')"
-  PHP_ZTS="$(php -r 'echo PHP_ZTS === 1 ? "zts" : "nts";')"
+  PHP_ZTS="$(php -r 'echo (bool)PHP_ZTS ? "zts" : "nts";')"
 
   if test -n "${CONTAINER_IMAGE_HASH}"; then
     IMAGE_HASH="${CONTAINER_IMAGE_HASH}"
@@ -274,7 +284,10 @@ EOF
 
   PSKEL_EXT_DIR="$(get_ext_dir)"
 
-  lcov --capture --directory "${PSKEL_EXT_DIR}" ${LCOV_OPTS} --exclude "/usr/local/include/*" --output-file "${PSKEL_EXT_DIR}/lcov.info"
+  lcov --capture --directory "${PSKEL_EXT_DIR}" \
+    ${LCOV_OPTS} \
+    --exclude "/usr/local/include/*" \
+    --output-file "${PSKEL_EXT_DIR}/lcov.info"
   lcov --list "${PSKEL_EXT_DIR}/lcov.info"
 }
 

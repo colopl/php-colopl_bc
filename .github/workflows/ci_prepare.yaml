@@ -1,0 +1,50 @@
+name: CI Prepare
+
+on:
+  workflow_call:
+    outputs:
+      artifact_name:
+        description: Name of the prepared workspace artifact
+        value: ${{ jobs.prepare.outputs.artifact_name }}
+      artifact_run_id:
+        description: Run ID that stores the workspace artifact
+        value: ${{ jobs.prepare.outputs.artifact_run_id }}
+      archive_name:
+        description: Name of the tar.gz workspace archive
+        value: ${{ jobs.prepare.outputs.archive_name }}
+
+jobs:
+  prepare:
+    runs-on: ubuntu-24.04
+    outputs:
+      artifact_name: ${{ steps.metadata.outputs.artifact_name }}
+      artifact_run_id: ${{ steps.metadata.outputs.artifact_run_id }}
+      archive_name: ${{ steps.metadata.outputs.archive_name }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 1
+          submodules: recursive
+      - name: Record artifact metadata
+        id: metadata
+        run: |
+          ARTIFACT_NAME="repo-source-${GITHUB_RUN_ID}"
+          echo "artifact_name=${ARTIFACT_NAME}" >> "${GITHUB_OUTPUT}"
+          echo "artifact_run_id=${GITHUB_RUN_ID}" >> "${GITHUB_OUTPUT}"
+          echo "archive_name=${ARTIFACT_NAME}.tar.gz" >> "${GITHUB_OUTPUT}"
+      - name: Create workspace archive
+        id: archive
+        env:
+          ARCHIVE_NAME: ${{ steps.metadata.outputs.archive_name }}
+        run: |
+          ARCHIVE_PATH="${RUNNER_TEMP}/${ARCHIVE_NAME}"
+          REPO_DIR="$(basename "${GITHUB_WORKSPACE}")"
+          tar -czf "${ARCHIVE_PATH}" -C "$(dirname "${GITHUB_WORKSPACE}")" "${REPO_DIR}"
+          echo "archive-path=${ARCHIVE_PATH}" >> "${GITHUB_OUTPUT}"
+      - name: Upload prepared workspace
+        uses: actions/upload-artifact@v5
+        with:
+          name: ${{ steps.metadata.outputs.artifact_name }}
+          path: ${{ steps.archive.outputs.archive-path }}
+          retention-days: 1

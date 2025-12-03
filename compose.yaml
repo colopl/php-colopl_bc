@@ -1,6 +1,9 @@
 services:
   shell:
     image: ${SHELL_IMAGE:-shell}
+    # environment:
+      # - CONFIGURE_OPTS=--enable-pdo --enable-mysqlnd --with-pdo-mysql
+      # - LCOV_OPTS=--ignore-errors unused --exclude=/ext/third_party/* --ignore-errors unused --exclude=/workspaces/pskel/ext/third_party/*
     build:
       context: ./
       dockerfile: ./Dockerfile
@@ -10,3 +13,14 @@ services:
       - seccomp:unconfined
     privileged: true
     tty: true
+  #   depends_on:
+  #     - mysql
+  # mysql:
+  #   image: mysql:8.0
+  #   environment:
+  #     MYSQL_ROOT_PASSWORD: testing
+  #     MYSQL_DATABASE: testing
+  #     MYSQL_USER: testing
+  #     MYSQL_PASSWORD: testing
+  #   volumes:
+  #     - ./docker/mysql/etc/mysql/conf.d/my.cnf:/etc/mysql/conf.d/my.cnf

@@ -1,16 +1,37 @@
 name: CI macOS
 on:
   workflow_call:
+    inputs:
+      artifact_name:
+        required: true
+        type: string
+      artifact_run_id:
+        required: true
+        type: string
+      archive_name:
+        required: true
+        type: string
 jobs:
   init:
     runs-on: ubuntu-24.04
     outputs:
       needs-init: ${{ steps.check.outputs.needs-init }}
     steps:
-      - name: Checkout
-        uses: actions/checkout@v6
+      - name: Download prepared workspace
+        uses: actions/download-artifact@v6
         with:
-          submodules: true
+          name: ${{ inputs.artifact_name }}
+          path: ${{ runner.temp }}/source-archive
+          run-id: ${{ inputs.artifact_run_id }}
+          repository: ${{ github.repository }}
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+      - name: Extract prepared workspace
+        env:
+          ARCHIVE_NAME: ${{ inputs.archive_name }}
+        run: |
+          ARCHIVE_PATH="${RUNNER_TEMP}/source-archive/${ARCHIVE_NAME}"
+          tar -xzf "${ARCHIVE_PATH}" --strip-components=1 -C "${GITHUB_WORKSPACE}"
+          rm -f "${ARCHIVE_PATH}"
       - name: Check if initialization is needed
         id: check
         run: |
@@ -36,20 +57,27 @@ jobs:
     strategy:
       matrix:
         runs-on:
-          - macos-13            # amd64
-          - macos-14            # arm64
-          - macos-15            # arm64
-          # paid runners:
-            # - macos-13-xlarge # arm64
-            # - macos-14-large  # amd64
-            # - macos-15-large  # amd64
-        version: ['8.1', '8.2', '8.3', '8.4']
+          - macos-15
+          - macos-15-intel
+          - macos-26
+        version: ['8.1', '8.2', '8.3', '8.4', '8.5']
         ts: ['ts', 'nts']
     steps:
-      - name: Checkout
-        uses: actions/checkout@v6
+      - name: Download prepared workspace
+        uses: actions/download-artifact@v6
         with:
-          submodules: true
+          name: ${{ inputs.artifact_name }}
+          path: ${{ runner.temp }}/source-archive
+          run-id: ${{ inputs.artifact_run_id }}
+          repository: ${{ github.repository }}
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+      - name: Extract prepared workspace
+        env:
+          ARCHIVE_NAME: ${{ inputs.archive_name }}
+        run: |
+          ARCHIVE_PATH="${RUNNER_TEMP}/source-archive/${ARCHIVE_NAME}"
+          tar -xzf "${ARCHIVE_PATH}" --strip-components=1 -C "${GITHUB_WORKSPACE}"
+          rm -f "${ARCHIVE_PATH}"
       - name: Download initialized extension
         if: needs.init.outputs.needs-init == 'true'
         uses: actions/download-artifact@v6
@@ -57,7 +85,7 @@ jobs:
           name: initialized-ext-macos
           path: ext/
       - name: Setup PHP
-        uses: shivammathur/setup-php@bf6b4fbd49ca58e4608c9c89fba0b8d90bd2a39f # v2.35.5
+        uses: shivammathur/setup-php@44454db4f0199b8b9685a5d763dc37cbf79108e1 # v2.36.0
         with:
           php-version: ${{ matrix.version }}
           extensions: none

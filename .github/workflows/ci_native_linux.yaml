@@ -1,20 +1,39 @@
 name: CI Native Linux
+
 on:
   workflow_call:
+    inputs:
+      artifact_name:
+        required: true
+        type: string
+      artifact_run_id:
+        required: true
+        type: string
+      archive_name:
+        required: true
+        type: string
 jobs:
   Linux:
     strategy:
       matrix:
         runs-on: ['ubuntu-24.04', 'ubuntu-24.04-arm']
-        version: ['8.1', '8.2', '8.3', '8.4']
+        version: ['8.1', '8.2', '8.3', '8.4', '8.5']
         type: ['cli', 'zts']
         distro: ['trixie', 'alpine']
     runs-on: ${{ matrix.runs-on }}
     steps:
-      - name: Checkout
-        uses: actions/checkout@v6
+      - name: Download prepared workspace
+        uses: actions/download-artifact@v6
         with:
-          submodules: true
+          name: ${{ inputs.artifact_name }}
+          path: ${{ runner.temp }}/source-archive
+      - name: Extract prepared workspace
+        env:
+          ARCHIVE_NAME: ${{ inputs.archive_name }}
+        run: |
+          ARCHIVE_PATH="${RUNNER_TEMP}/source-archive/${ARCHIVE_NAME}"
+          tar -xzf "${ARCHIVE_PATH}" --strip-components=1 -C "${GITHUB_WORKSPACE}"
+          rm -f "${ARCHIVE_PATH}"
       - name: Pull PHP container image
         id: pull-image
         run: |

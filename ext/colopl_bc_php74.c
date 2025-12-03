@@ -110,6 +110,18 @@ static int legacy_compare_fast(zval *op1, zval *op2)
 			case COLOPL_BC_TYPE_PAIR(IS_TRUE, IS_NULL):
 				return 1;
 
+			case COLOPL_BC_TYPE_PAIR(IS_TRUE, IS_OBJECT):
+				return zval_is_true(op2) ? 0 : 1;
+
+			case COLOPL_BC_TYPE_PAIR(IS_FALSE, IS_OBJECT):
+				return zval_is_true(op2) ? -1 : 0;
+
+			case COLOPL_BC_TYPE_PAIR(IS_OBJECT, IS_TRUE):
+				return zval_is_true(op1) ? 0 : -1;
+
+			case COLOPL_BC_TYPE_PAIR(IS_OBJECT, IS_FALSE):
+				return zval_is_true(op1) ? 1 : 0;
+
 			case COLOPL_BC_TYPE_PAIR(IS_STRING, IS_STRING):
 				if (Z_STR_P(op1) == Z_STR_P(op2)) {
 					return 0;
@@ -181,7 +193,7 @@ static int legacy_compare_slow(zval *op1, zval *op2)
 {
 	int bc = legacy_compare_fast(op1, op2);
 	int native = zend_compare(op1, op2);
-	
+
 	if (native != bc) {
 		if (COLOPL_BC_G(php74_compare_mode) & COLOPL_BC_PHP74_COMPARE_MODE_LOG) {
 			php_log_err_with_severity("Incompatible compare detected", LOG_NOTICE);
@@ -931,12 +943,12 @@ static void legacy_hash_sort_slow(INTERNAL_FUNCTION_PARAMETERS, zval *array, buc
 
 	/* Get native PHP bundled (internal) function ptr */
 	fnname_ptr = execute_data->func->internal_function.function_name->val;
-	/* 
+	/*
 	 * Extracting last piece of namespaces, they're always identical a native function name
-	 * 
+	 *
 	 * e.g.)
 	 * Colopl\ColoplBc\Php74\*****
-	 *                                     ^^^^^
+	 *                       ^^^^^
 	 */
 	while (strchr(fnname_ptr, '\\')) {
 		++fnname_ptr;
@@ -993,7 +1005,7 @@ static void php_colopl_bc_usort(INTERNAL_FUNCTION_PARAMETERS, bucket_compare_fun
 		PHP_COLOPL_BC_ARRAY_CMP_FUNC_RESTORE();
 		RETURN_TRUE;
 	}
-	
+
 	COLOPL_BC_G(php74_hash_sort_func)(INTERNAL_FUNCTION_PARAM_PASSTHRU, &arr, compare_func, renumber);
 
 	zval_ptr_dtor(array);

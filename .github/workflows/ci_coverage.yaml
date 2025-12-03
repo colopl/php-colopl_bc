@@ -5,24 +5,35 @@ permissions:
   pages: write
   id-token: write
 on:
-  push:
-    branches:
-      - main
-  pull_request:
-    types:
-      - opened
-      - synchronize
-      - reopened
+  workflow_call:
+    inputs:
+      artifact_name:
+        required: true
+        type: string
+      artifact_run_id:
+        required: true
+        type: string
+      archive_name:
+        required: true
+        type: string
 jobs:
   init:
     runs-on: ubuntu-24.04
     outputs:
       needs-init: ${{ steps.check.outputs.needs-init }}
     steps:
-      - name: Checkout
-        uses: actions/checkout@v6
+      - name: Download prepared workspace
+        uses: actions/download-artifact@v6
         with:
-          submodules: true
+          name: ${{ inputs.artifact_name }}
+          path: ${{ runner.temp }}/source-archive
+      - name: Extract prepared workspace
+        env:
+          ARCHIVE_NAME: ${{ inputs.archive_name }}
+        run: |
+          ARCHIVE_PATH="${RUNNER_TEMP}/source-archive/${ARCHIVE_NAME}"
+          tar -xzf "${ARCHIVE_PATH}" --strip-components=1 -C "${GITHUB_WORKSPACE}"
+          rm -f "${ARCHIVE_PATH}"
       - name: Check if initialization is needed
         id: check
         run: |
@@ -47,14 +58,22 @@ jobs:
     runs-on: ${{ matrix.platform }}
     strategy:
       matrix:
-        versions: ['8.4']
+        versions: ['8.5']
         platform: ['ubuntu-24.04', 'ubuntu-24.04-arm']
         ts: ['cli', 'zts']
     steps:
-      - name: Checkout
-        uses: actions/checkout@v6
+      - name: Download prepared workspace
+        uses: actions/download-artifact@v6
         with:
-          submodules: true
+          name: ${{ inputs.artifact_name }}
+          path: ${{ runner.temp }}/source-archive
+      - name: Extract prepared workspace
+        env:
+          ARCHIVE_NAME: ${{ inputs.archive_name }}
+        run: |
+          ARCHIVE_PATH="${RUNNER_TEMP}/source-archive/${ARCHIVE_NAME}"
+          tar -xzf "${ARCHIVE_PATH}" --strip-components=1 -C "${GITHUB_WORKSPACE}"
+          rm -f "${ARCHIVE_PATH}"
       - name: Download initialized extension
         if: needs.init.outputs.needs-init == 'true'
         uses: actions/download-artifact@v6
@@ -80,15 +99,27 @@ jobs:
           path: "${{ matrix.platform }}_${{ matrix.versions }}_${{ matrix.ts }}_lcov.info"
           retention-days: 1
   deploy-pages:
-    needs: [coverage, init]
+    needs:
+      - init
+      - coverage
     runs-on: ubuntu-24.04
     if: github.ref == 'refs/heads/main'
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
     steps:
-      - name: Checkout
-        uses: actions/checkout@v6
+      - name: Download prepared workspace
+        uses: actions/download-artifact@v6
+        with:
+          name: ${{ inputs.artifact_name }}
+          path: ${{ runner.temp }}/source-archive
+      - name: Extract prepared workspace
+        env:
+          ARCHIVE_NAME: ${{ inputs.archive_name }}
+        run: |
+          ARCHIVE_PATH="${RUNNER_TEMP}/source-archive/${ARCHIVE_NAME}"
+          tar -xzf "${ARCHIVE_PATH}" --strip-components=1 -C "${GITHUB_WORKSPACE}"
+          rm -f "${ARCHIVE_PATH}"
       - name: Install lcov
         run: |
           sudo apt-get update
@@ -99,36 +130,40 @@ jobs:
           pattern: coverage-*
           merge-multiple: true
           path: coverage-files/
-      - name: Merge coverage files
-        run: |
-          COVERAGE_FILES=$(find "coverage-files/" -name "*_lcov.info" -type f)
-          if test -z "${COVERAGE_FILES}"; then
-            echo "No coverage files found"
-            exit 1
-          fi
-
-          TRACEFILE_ARGS=""
-          for FILE in ${COVERAGE_FILES}; do
-            TRACEFILE_ARGS="${TRACEFILE_ARGS} --add-tracefile ${FILE}"
-          done
-
-          lcov ${TRACEFILE_ARGS} --ignore-errors format --output-file "lcov.info"
       - name: Download initialized extension
         if: needs.init.outputs.needs-init == 'true'
         uses: actions/download-artifact@v6
         with:
           name: initialized-ext-coverage
           path: ext/
-      - name: Generate HTML coverage report
+      - name: Generate integrated HTML coverage reports
         run: |
+          if ! test -d "/ext"; then
+            sudo ln -s "${GITHUB_WORKSPACE}/ext" /ext
+          fi
           mkdir -p "coverage-html"
-          sudo mv "ext" "/"
-          sudo chmod -R +r "/ext"
-          genhtml --output-directory "coverage-html" --title "Coverage Report" "lcov.info"
-      - name: Run octocov
-        uses: k1LoW/octocov-action@73d561f65d59e66899ed5c87e4621a913b5d5c20
-        with:
-          config: .github/octocov.yml
+          cd "coverage-files" || exit 1
+          set -- ./*.info
+          if test "${1}" = "./*.info"; then
+            echo "No coverage .info files found"
+            exit 1
+          fi
+          if test "${2+set}" != "set"; then
+            cp "${1}" ../total.info
+          else
+            lcov --ignore-errors format -a "${1}" -a "${2}" -o "merged.info"
+            shift 2
+            while test "$#" -gt 0; do
+              lcov --ignore-errors format -a "merged.info" -a "${1}" -o "merged2.info"
+              mv "merged2.info" "merged.info"
+              shift
+            done
+            mv "merged.info" ../total.info
+          fi
+          cd - || exit 1
+          genhtml "total.info" \
+            --output-directory "coverage-html" \
+            --title "Extension code coverage"
       - name: Setup Pages
         uses: actions/configure-pages@v5
       - name: Upload Pages artifact

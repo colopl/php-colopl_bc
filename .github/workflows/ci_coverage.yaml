@@ -88,6 +88,7 @@ jobs:
         run: |
           docker compose build \
             --build-arg TAG="${{ matrix.versions }}-${{ matrix.ts }}" \
+            --build-arg SKIP_VALGRIND=1 \
             shell
           touch "lcov.info"
           docker compose run -v "$(pwd)/lcov.info:/ext/lcov.info" --rm shell pskel coverage

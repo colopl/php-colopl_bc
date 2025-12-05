@@ -49,7 +49,7 @@ RUN docker-php-source extract \
 
 COPY ./third_party/valgrind "/third_party/valgrind"
 ARG SKIP_VALGRIND
-RUN if test "${SKIP_VALGRIND}" != "1"; then \
+RUN if test "${SKIP_VALGRIND}" != "1" && test -f "/etc/debian_version"; then \
       cd "/third_party/valgrind" && \
         if test -f "/etc/debian_version"; then \
           apt-get update && \

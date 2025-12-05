@@ -12,7 +12,6 @@ on:
       archive_name:
         description: Name of the tar.gz workspace archive
         value: ${{ jobs.prepare.outputs.archive_name }}
-
 jobs:
   prepare:
     runs-on: ubuntu-24.04

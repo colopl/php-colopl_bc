@@ -46,7 +46,7 @@ jobs:
           ARCH="$(uname -m)"
           echo "key=php-bins-${{ matrix.version }}-${{ matrix.type }}-${{ matrix.distro }}-${ARCH}-${{ steps.pull-image.outputs.image_hash }}" >> "${GITHUB_OUTPUT}"
       - name: Cache PHP binaries
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: php-cache
           key: ${{ steps.cache-key.outputs.key }}

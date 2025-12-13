@@ -22,7 +22,7 @@ jobs:
         distro: ['trixie', 'alpine']
     steps:
       - name: Download prepared workspace
-        uses: actions/download-artifact@v6
+        uses: actions/download-artifact@v7
         with:
           name: ${{ inputs.artifact_name }}
           path: ${{ runner.temp }}/source-archive

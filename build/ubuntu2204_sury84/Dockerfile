@@ -1,6 +1,6 @@
 ARG PLATFORM=${BUILDPLATFORM:-linux/amd64}
 
-FROM --platform=${PLATFORM} ubuntu:22.04
+FROM --platform=${PLATFORM} ubuntu:24.04
 
 ENV DEBIAN_FRONTEND="noninteractive"
 

@@ -1,5 +1,5 @@
 ARG IMAGE=php
-ARG TAG=8.2-cli
+ARG TAG=8.5-cli
 
 FROM ${IMAGE}:${TAG}
 

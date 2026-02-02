@@ -42,7 +42,7 @@ jobs:
           tar -czf "${ARCHIVE_PATH}" -C "$(dirname "${GITHUB_WORKSPACE}")" "${REPO_DIR}"
           echo "archive-path=${ARCHIVE_PATH}" >> "${GITHUB_OUTPUT}"
       - name: Upload prepared workspace
-        uses: actions/upload-artifact@v5
+        uses: actions/upload-artifact@v6
         with:
           name: ${{ steps.metadata.outputs.artifact_name }}
           path: ${{ steps.archive.outputs.archive-path }}

@@ -18,7 +18,7 @@ jobs:
       needs-init: ${{ steps.check.outputs.needs-init }}
     steps:
       - name: Download prepared workspace
-        uses: actions/download-artifact@v6
+        uses: actions/download-artifact@v7
         with:
           name: ${{ inputs.artifact_name }}
           path: ${{ runner.temp }}/source-archive
@@ -46,7 +46,7 @@ jobs:
           docker compose run -v"$(pwd)/ext:/ext" --rm shell pskel init example
       - name: Upload initialized extension
         if: steps.check.outputs.needs-init == 'true'
-        uses: actions/upload-artifact@v5
+        uses: actions/upload-artifact@v6
         with:
           name: initialized-ext-macos
           path: ext/
@@ -64,7 +64,7 @@ jobs:
         ts: ['ts', 'nts']
     steps:
       - name: Download prepared workspace
-        uses: actions/download-artifact@v6
+        uses: actions/download-artifact@v7
         with:
           name: ${{ inputs.artifact_name }}
           path: ${{ runner.temp }}/source-archive
@@ -80,7 +80,7 @@ jobs:
           rm -f "${ARCHIVE_PATH}"
       - name: Download initialized extension
         if: needs.init.outputs.needs-init == 'true'
-        uses: actions/download-artifact@v6
+        uses: actions/download-artifact@v7
         with:
           name: initialized-ext-macos
           path: ext/

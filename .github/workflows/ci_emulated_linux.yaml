@@ -79,6 +79,7 @@ jobs:
             --build-arg PLATFORM="${{ matrix.platform }}" \
             --build-arg TAG="${{ matrix.version }}-${{ matrix.type }}-${{ matrix.distro }}" \
             --build-arg SKIP_VALGRIND=1 \
+            --build-arg ENABLE_CLANG=0 \
             shell
           docker tag shell "${{ steps.image-tag.outputs.tag }}"
       - name: Push image to GitHub Container Registry

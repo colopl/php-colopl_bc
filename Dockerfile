@@ -23,7 +23,6 @@ RUN docker-php-source extract \
         "vim" \
         "unzip" && \
         if test "${ENABLE_CLANG}" = "1"; then \
-          mkdir -p "/usr/share/keyrings" && \
           # fixme: re-enable keyring usage when SHA256 key is available
           # apt-get --no-install-recommends -y "gnupg" && \
           # curl -sSL "https://apt.llvm.org/llvm-snapshot.gpg.key" | gpg --dearmor > "/usr/share/keyrings/llvm-archive-keyring.gpg" && \

@@ -18,15 +18,17 @@ RUN docker-php-source extract \
       apt-get update \
  &&   DEBIAN_FRONTEND="noninteractive" apt-get install -y "bison" "re2c" "zlib1g-dev" "libsqlite3-dev" "libxml2-dev" \
         "autoconf" "pkg-config" "make" "gcc" "rsync" "git" "ssh" "libc6-dbg" \
-        "ca-certificates" "tzdata" "lsb-release" "curl" "gnupg" \
+        "ca-certificates" "tzdata" "lsb-release" "curl" \
         "lcov" "gzip" \
         "vim" \
         "unzip" && \
         if test "${ENABLE_CLANG}" = "1"; then \
           mkdir -p "/usr/share/keyrings" && \
-          curl -sSL "https://apt.llvm.org/llvm-snapshot.gpg.key" | gpg --dearmor > "/usr/share/keyrings/llvm-archive-keyring.gpg" && \
-          echo "deb [signed-by=/usr/share/keyrings/llvm-archive-keyring.gpg] http://apt.llvm.org/$(lsb_release -cs)/ llvm-toolchain-$(lsb_release -cs) main" > "/etc/apt/sources.list.d/llvm.list" && \
-          echo "deb [signed-by=/usr/share/keyrings/llvm-archive-keyring.gpg] http://apt.llvm.org/$(lsb_release -cs)/ llvm-toolchain-$(lsb_release -cs)-21 main" >> "/etc/apt/sources.list.d/llvm.list" && \
+          # fixme: re-enable keyring usage when SHA256 key is available
+          # apt-get --no-install-recommends -y "gnupg" && \
+          # curl -sSL "https://apt.llvm.org/llvm-snapshot.gpg.key" | gpg --dearmor > "/usr/share/keyrings/llvm-archive-keyring.gpg" && \
+          echo "deb [trusted=yes] http://apt.llvm.org/$(lsb_release -cs)/ llvm-toolchain-$(lsb_release -cs) main" > "/etc/apt/sources.list.d/llvm.list" && \
+          echo "deb [trusted=yes] http://apt.llvm.org/$(lsb_release -cs)/ llvm-toolchain-$(lsb_release -cs)-21 main" >> "/etc/apt/sources.list.d/llvm.list" && \
           apt-get update && \
           DEBIAN_FRONTEND="noninteractive" apt-get install --no-install-recommends -y \
           "clang-21" "clang-tools-21" "clang-format-21" "clang-tidy-21" \

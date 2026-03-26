@@ -2,8 +2,11 @@ ARG PLATFORM=${BUILDPLATFORM:-linux/amd64}
 ARG IMAGE=php
 ARG TAG=8.5-cli-trixie
 ARG SKIP_VALGRIND=0
+ARG ENABLE_CLANG=1
 
 FROM --platform=${PLATFORM} ${IMAGE}:${TAG}
+
+ARG ENABLE_CLANG=1
 
 ENV USE_ZEND_ALLOC=0
 ENV USE_TRACKED_ALLOC=1
@@ -19,25 +22,27 @@ RUN docker-php-source extract \
         "lcov" "gzip" \
         "vim" \
         "unzip" && \
-        mkdir -p "/usr/share/keyrings" && \
-        curl -sSL "https://apt.llvm.org/llvm-snapshot.gpg.key" | gpg --dearmor > "/usr/share/keyrings/llvm-archive-keyring.gpg" && \
-        echo "deb [signed-by=/usr/share/keyrings/llvm-archive-keyring.gpg] http://apt.llvm.org/$(lsb_release -cs)/ llvm-toolchain-$(lsb_release -cs) main" > "/etc/apt/sources.list.d/llvm.list" && \
-        echo "deb [signed-by=/usr/share/keyrings/llvm-archive-keyring.gpg] http://apt.llvm.org/$(lsb_release -cs)/ llvm-toolchain-$(lsb_release -cs)-21 main" >> "/etc/apt/sources.list.d/llvm.list" && \
-        apt-get update && \
-        DEBIAN_FRONTEND="noninteractive" apt-get install --no-install-recommends -y \
-        "clang-21" "clang-tools-21" "clang-format-21" "clang-tidy-21" \
-        "libclang-rt-21-dev" "lld-21" "lldb-21" \
-        "libc++-21-dev" "libc++abi-21-dev" \
-        "llvm-21" "llvm-21-dev" "llvm-21-runtime" \
-        "clang-format-21" && \
-        update-alternatives --install "/usr/bin/clang" clang "/usr/bin/clang-21" 100 && \
-        update-alternatives --install "/usr/bin/clang++" clang++ "/usr/bin/clang++-21" 100 && \
-        update-alternatives --install "/usr/bin/clang-format" clang-format "/usr/bin/clang-format-21" 100 && \
-        update-alternatives --install "/usr/bin/clang-tidy" clang-tidy "/usr/bin/clang-tidy-21" 100 && \
-        update-alternatives --install "/usr/bin/lldb" lldb "/usr/bin/lldb-21" 100 && \
-        update-alternatives --install "/usr/bin/ld.lld" ld.lld "/usr/bin/ld.lld-21" 100; \
-        update-alternatives --install "/usr/bin/llvm-symbolizer" llvm-symbolizer "/usr/bin/llvm-symbolizer-21" 100 && \
-        update-alternatives --install "/usr/bin/llvm-config" llvm-config "/usr/bin/llvm-config-21" 100; \
+        if test "${ENABLE_CLANG}" = "1"; then \
+          mkdir -p "/usr/share/keyrings" && \
+          curl -sSL "https://apt.llvm.org/llvm-snapshot.gpg.key" | gpg --dearmor > "/usr/share/keyrings/llvm-archive-keyring.gpg" && \
+          echo "deb [signed-by=/usr/share/keyrings/llvm-archive-keyring.gpg] http://apt.llvm.org/$(lsb_release -cs)/ llvm-toolchain-$(lsb_release -cs) main" > "/etc/apt/sources.list.d/llvm.list" && \
+          echo "deb [signed-by=/usr/share/keyrings/llvm-archive-keyring.gpg] http://apt.llvm.org/$(lsb_release -cs)/ llvm-toolchain-$(lsb_release -cs)-21 main" >> "/etc/apt/sources.list.d/llvm.list" && \
+          apt-get update && \
+          DEBIAN_FRONTEND="noninteractive" apt-get install --no-install-recommends -y \
+          "clang-21" "clang-tools-21" "clang-format-21" "clang-tidy-21" \
+          "libclang-rt-21-dev" "lld-21" "lldb-21" \
+          "libc++-21-dev" "libc++abi-21-dev" \
+          "llvm-21" "llvm-21-dev" "llvm-21-runtime" \
+          "clang-format-21" && \
+          update-alternatives --install "/usr/bin/clang" clang "/usr/bin/clang-21" 100 && \
+          update-alternatives --install "/usr/bin/clang++" clang++ "/usr/bin/clang++-21" 100 && \
+          update-alternatives --install "/usr/bin/clang-format" clang-format "/usr/bin/clang-format-21" 100 && \
+          update-alternatives --install "/usr/bin/clang-tidy" clang-tidy "/usr/bin/clang-tidy-21" 100 && \
+          update-alternatives --install "/usr/bin/lldb" lldb "/usr/bin/lldb-21" 100 && \
+          update-alternatives --install "/usr/bin/ld.lld" ld.lld "/usr/bin/ld.lld-21" 100 && \
+          update-alternatives --install "/usr/bin/llvm-symbolizer" llvm-symbolizer "/usr/bin/llvm-symbolizer-21" 100 && \
+          update-alternatives --install "/usr/bin/llvm-config" llvm-config "/usr/bin/llvm-config-21" 100; \
+        fi && \
     else \
       apk add --no-cache "bison" "zlib-dev" "sqlite-dev" "libxml2-dev" "linux-headers" \
         "autoconf" "pkgconfig" "make" "gcc" "g++" "musl-dbg" \

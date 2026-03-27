@@ -8,9 +8,6 @@ on:
       artifact_run_id:
         required: true
         type: string
-      archive_name:
-        required: true
-        type: string
 jobs:
   Linux:
     runs-on: ubuntu-24.04
@@ -25,14 +22,7 @@ jobs:
         uses: actions/download-artifact@v8
         with:
           name: ${{ inputs.artifact_name }}
-          path: ${{ runner.temp }}/source-archive
-      - name: Extract prepared workspace
-        env:
-          ARCHIVE_NAME: ${{ inputs.archive_name }}
-        run: |
-          ARCHIVE_PATH="${RUNNER_TEMP}/source-archive/${ARCHIVE_NAME}"
-          tar -xzf "${ARCHIVE_PATH}" --strip-components=1 -C "${GITHUB_WORKSPACE}"
-          rm -f "${ARCHIVE_PATH}"
+          path: ${{ github.workspace }}
       - name: Setup QEMU
         uses: docker/setup-qemu-action@ce360397dd3f832beb865e1373c09c0e9f86d70a # v4.0.0
         with:

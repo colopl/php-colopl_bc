@@ -8,9 +8,6 @@ on:
       artifact_run_id:
         required: true
         type: string
-      archive_name:
-        required: true
-        type: string
 jobs:
   init:
     runs-on: ubuntu-24.04
@@ -21,14 +18,7 @@ jobs:
         uses: actions/download-artifact@v8
         with:
           name: ${{ inputs.artifact_name }}
-          path: ${{ runner.temp }}/source-archive
-      - name: Extract prepared workspace
-        env:
-          ARCHIVE_NAME: ${{ inputs.archive_name }}
-        run: |
-          ARCHIVE_PATH="${RUNNER_TEMP}/source-archive/${ARCHIVE_NAME}"
-          tar -xzf "${ARCHIVE_PATH}" --strip-components=1 -C "${GITHUB_WORKSPACE}"
-          rm -f "${ARCHIVE_PATH}"
+          path: ${{ github.workspace }}
       - name: Check if initialization is needed
         id: check
         run: |
@@ -47,6 +37,7 @@ jobs:
         with:
           name: initialized-ext-windows
           path: ext/
+          archive: false
           retention-days: 1
   Windows:
     needs: init
@@ -64,16 +55,7 @@ jobs:
         uses: actions/download-artifact@v8
         with:
           name: ${{ inputs.artifact_name }}
-          path: ${{ runner.temp }}/source-archive
-      - name: Extract prepared workspace
-        shell: pwsh
-        env:
-          ARCHIVE_NAME: ${{ inputs.archive_name }}
-        run: |
-          $downloadDir = Join-Path $env:RUNNER_TEMP "source-archive"
-          $archivePath = Join-Path $downloadDir $env:ARCHIVE_NAME
-          tar.exe -xzf $archivePath -C $env:GITHUB_WORKSPACE --strip-components=1
-          Remove-Item $archivePath
+          path: ${{ github.workspace }}
       - name: Download initialized extension
         if: needs.init.outputs.needs-init == 'true'
         uses: actions/download-artifact@v8

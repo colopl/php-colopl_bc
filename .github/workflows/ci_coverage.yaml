@@ -13,9 +13,6 @@ on:
       artifact_run_id:
         required: true
         type: string
-      archive_name:
-        required: true
-        type: string
 jobs:
   init:
     runs-on: ubuntu-24.04
@@ -26,14 +23,7 @@ jobs:
         uses: actions/download-artifact@v8
         with:
           name: ${{ inputs.artifact_name }}
-          path: ${{ runner.temp }}/source-archive
-      - name: Extract prepared workspace
-        env:
-          ARCHIVE_NAME: ${{ inputs.archive_name }}
-        run: |
-          ARCHIVE_PATH="${RUNNER_TEMP}/source-archive/${ARCHIVE_NAME}"
-          tar -xzf "${ARCHIVE_PATH}" --strip-components=1 -C "${GITHUB_WORKSPACE}"
-          rm -f "${ARCHIVE_PATH}"
+          path: ${{ github.workspace }}
       - name: Check if initialization is needed
         id: check
         run: |
@@ -52,6 +42,7 @@ jobs:
         with:
           name: initialized-ext-coverage
           path: ext/
+          archive: false
           retention-days: 1
   coverage:
     needs: init
@@ -66,14 +57,7 @@ jobs:
         uses: actions/download-artifact@v8
         with:
           name: ${{ inputs.artifact_name }}
-          path: ${{ runner.temp }}/source-archive
-      - name: Extract prepared workspace
-        env:
-          ARCHIVE_NAME: ${{ inputs.archive_name }}
-        run: |
-          ARCHIVE_PATH="${RUNNER_TEMP}/source-archive/${ARCHIVE_NAME}"
-          tar -xzf "${ARCHIVE_PATH}" --strip-components=1 -C "${GITHUB_WORKSPACE}"
-          rm -f "${ARCHIVE_PATH}"
+          path: ${{ github.workspace }}
       - name: Download initialized extension
         if: needs.init.outputs.needs-init == 'true'
         uses: actions/download-artifact@v8
@@ -98,6 +82,7 @@ jobs:
         with:
           name: coverage-${{ matrix.platform }}-${{ matrix.versions }}-${{ matrix.ts }}
           path: "${{ matrix.platform }}_${{ matrix.versions }}_${{ matrix.ts }}_lcov.info"
+          archive: false
           retention-days: 1
   deploy-pages:
     needs:
@@ -113,14 +98,7 @@ jobs:
         uses: actions/download-artifact@v8
         with:
           name: ${{ inputs.artifact_name }}
-          path: ${{ runner.temp }}/source-archive
-      - name: Extract prepared workspace
-        env:
-          ARCHIVE_NAME: ${{ inputs.archive_name }}
-        run: |
-          ARCHIVE_PATH="${RUNNER_TEMP}/source-archive/${ARCHIVE_NAME}"
-          tar -xzf "${ARCHIVE_PATH}" --strip-components=1 -C "${GITHUB_WORKSPACE}"
-          rm -f "${ARCHIVE_PATH}"
+          path: ${{ github.workspace }}
       - name: Install lcov
         run: |
           sudo apt-get update

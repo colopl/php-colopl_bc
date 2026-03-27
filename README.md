@@ -7,8 +7,8 @@ Provides various compatibility functions required for PHP (temporary) migration.
 
 ## Supported Versions
 
-- Extension: PHP >= 8.0, 8.4 >= PHP
-- Library: PHP >= 7.4, 8.4 >= PHP
+- Extension: PHP >= 8.0, 8.5 >= PHP
+- Library: PHP >= 7.4, 8.5 >= PHP
 
 Library is introduced for migration to PHP 8.x with the same code base. If you do not need to work with the same code base, you can use only the Extension.
 
@@ -105,7 +105,7 @@ Compares the result with the result of a native PHP function and raises an error
 
 Compares the results of native PHP functions and sends a log to the running SAPI if the results are different.
 
-### Constants 
+### Constants
 
 Please check the settings of the corresponding ini directives.
 

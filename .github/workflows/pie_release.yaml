@@ -9,7 +9,7 @@ permissions:
   contents: read
 
 jobs:
-  create-draft-release:
+  CreateDraftRelease:
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -22,9 +22,8 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: gh release create "${{ github.ref_name }}" --title "${{ github.ref_name }}" --draft --notes-from-tag
-
-  add-pie-binaries:
-    needs: [ create-draft-release ]
+  AddPieBinaries:
+    needs: [ CreateDraftRelease ]
     runs-on: ${{ matrix.operating-system }}
     strategy:
       fail-fast: false
@@ -59,8 +58,8 @@ jobs:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           configure-flags: '--enable-colopl_bc'
           build-path: 'ext'
-  get-windows-extension-matrix:
-    needs: [ create-draft-release ]
+  GetWindowsExtensionMatrix:
+    needs: [ CreateDraftRelease ]
     runs-on: ubuntu-latest
     outputs:
       matrix: ${{ steps.extension-matrix.outputs.matrix }}
@@ -71,27 +70,35 @@ jobs:
           fetch-depth: 1
       - name: Get the extension matrix
         id: extension-matrix
-        uses: php/php-windows-builder/extension-matrix@v1
-  build-windows:
-    needs: get-windows-extension-matrix
+        uses: php/php-windows-builder/extension-matrix@e0e01747e758fc325cb6591b904589b11a0ea4c8 # v1.7.0
+        with:
+          php-version-list: '8.1,8.2,8.3,8.4,8.5'
+  BuildWindows:
+    needs: GetWindowsExtensionMatrix
     runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
-      matrix: ${{ fromJson(needs.get-windows-extension-matrix.outputs.matrix) }}
+      matrix: ${{ fromJson(needs.GetWindowsExtensionMatrix.outputs.matrix) }}
     steps:
       - name: Checkout
         uses: actions/checkout@v6
         with:
           fetch-depth: 1
+      # Workaround: php-windows-builder reads config.w32 from repo root,
+      # but our extension source is in ext/. Copy ext/* to root so the
+      # action can find config.w32 and the source files.
+      - name: Copy extension source to root
+        shell: pwsh
+        run: Copy-Item -Path ext\* -Destination . -Recurse -Force
       - name: Build the extension
         uses: php/php-windows-builder/extension@e0e01747e758fc325cb6591b904589b11a0ea4c8 # v1.7.0
         with:
           php-version: ${{ matrix.php-version }}
           arch: ${{ matrix.arch }}
           ts: ${{ matrix.ts }}
-  release-windows:
+  ReleaseWindows:
     runs-on: ubuntu-latest
-    needs: build-windows
+    needs: BuildWindows
     permissions:
       contents: write
     steps:
@@ -100,3 +107,13 @@ jobs:
         with:
           release: ${{ github.ref_name }}
           token: ${{ secrets.GITHUB_TOKEN }}
+  publish-release:
+    needs: [ AddPieBinaries, ReleaseWindows ]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Publish release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release edit "${{ github.ref_name }}" --draft=false --repo "${{ github.repository }}"

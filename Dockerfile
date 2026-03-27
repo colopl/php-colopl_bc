@@ -23,11 +23,10 @@ RUN docker-php-source extract \
         "vim" \
         "unzip" && \
         if test "${ENABLE_CLANG}" = "1"; then \
-          # fixme: re-enable keyring usage when SHA256 key is available
-          # apt-get --no-install-recommends -y "gnupg" && \
-          # curl -sSL "https://apt.llvm.org/llvm-snapshot.gpg.key" | gpg --dearmor > "/usr/share/keyrings/llvm-archive-keyring.gpg" && \
-          echo "deb [trusted=yes] http://apt.llvm.org/$(lsb_release -cs)/ llvm-toolchain-$(lsb_release -cs) main" > "/etc/apt/sources.list.d/llvm.list" && \
-          echo "deb [trusted=yes] http://apt.llvm.org/$(lsb_release -cs)/ llvm-toolchain-$(lsb_release -cs)-21 main" >> "/etc/apt/sources.list.d/llvm.list" && \
+          mkdir -p "/etc/apt/keyrings" && \
+          curl -sSL "https://apt.llvm.org/llvm-snapshot.gpg.key" -o "/etc/apt/keyrings/llvm-archive-keyring.asc" && \
+          echo "deb [signed-by=/etc/apt/keyrings/llvm-archive-keyring.asc] http://apt.llvm.org/$(lsb_release -cs)/ llvm-toolchain-$(lsb_release -cs) main" > "/etc/apt/sources.list.d/llvm.list" && \
+          echo "deb [signed-by=/etc/apt/keyrings/llvm-archive-keyring.asc] http://apt.llvm.org/$(lsb_release -cs)/ llvm-toolchain-$(lsb_release -cs)-21 main" >> "/etc/apt/sources.list.d/llvm.list" && \
           apt-get update && \
           DEBIAN_FRONTEND="noninteractive" apt-get install --no-install-recommends -y \
           "clang-21" "clang-tools-21" "clang-format-21" "clang-tidy-21" \

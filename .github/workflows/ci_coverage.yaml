@@ -13,6 +13,9 @@ on:
       artifact_run_id:
         required: true
         type: string
+      archive_name:
+        required: true
+        type: string
 jobs:
   init:
     runs-on: ubuntu-24.04
@@ -23,7 +26,10 @@ jobs:
         uses: actions/download-artifact@v8
         with:
           name: ${{ inputs.artifact_name }}
-          path: ${{ github.workspace }}
+          path: ${{ runner.temp }}
+      - name: Extract prepared workspace
+        run: |
+          tar -xzf "${RUNNER_TEMP}/${{ inputs.archive_name }}" --strip-components=1 -C "${GITHUB_WORKSPACE}"
       - name: Check if initialization is needed
         id: check
         run: |
@@ -56,7 +62,10 @@ jobs:
         uses: actions/download-artifact@v8
         with:
           name: ${{ inputs.artifact_name }}
-          path: ${{ github.workspace }}
+          path: ${{ runner.temp }}
+      - name: Extract prepared workspace
+        run: |
+          tar -xzf "${RUNNER_TEMP}/${{ inputs.archive_name }}" --strip-components=1 -C "${GITHUB_WORKSPACE}"
       - name: Download initialized extension
         if: needs.init.outputs.needs-init == 'true'
         uses: actions/download-artifact@v8
@@ -97,7 +106,10 @@ jobs:
         uses: actions/download-artifact@v8
         with:
           name: ${{ inputs.artifact_name }}
-          path: ${{ github.workspace }}
+          path: ${{ runner.temp }}
+      - name: Extract prepared workspace
+        run: |
+          tar -xzf "${RUNNER_TEMP}/${{ inputs.archive_name }}" --strip-components=1 -C "${GITHUB_WORKSPACE}"
       - name: Install lcov
         run: |
           sudo apt-get update

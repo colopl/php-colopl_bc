@@ -9,6 +9,9 @@ on:
       artifact_run_id:
         required: true
         type: string
+      archive_name:
+        required: true
+        type: string
 jobs:
   Linux:
     strategy:
@@ -23,7 +26,10 @@ jobs:
         uses: actions/download-artifact@v8
         with:
           name: ${{ inputs.artifact_name }}
-          path: ${{ github.workspace }}
+          path: ${{ runner.temp }}
+      - name: Extract prepared workspace
+        run: |
+          tar -xzf "${RUNNER_TEMP}/${{ inputs.archive_name }}" --strip-components=1 -C "${GITHUB_WORKSPACE}"
       - name: Pull PHP container image
         id: pull-image
         run: |

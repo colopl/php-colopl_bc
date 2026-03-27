@@ -1,7 +1,7 @@
 {
     "name": "colopl/colopl_bc",
     "description": "PHP Backwards compatibility library.",
-    "type": "library",
+    "type": "php-ext",
     "autoload": {
         "psr-4": {
             "Colopl\\ColoplBc\\": "src/"
@@ -21,6 +21,20 @@
         "phpunit/phpunit": "^10 || ^11 || ^12.4.5 || ^13.0.0",
         "phpstan/phpstan-phpunit": "^2.0.8",
         "rector/rector": "^2.2.11"
+    },
+    "replace": {
+        "ext-colopl_bc": "*"
+    },
+    "php-ext": {
+        "extension-name": "colopl_bc",
+        "build-path": "ext",
+        "download-url-method": ["pre-packaged-binary", "composer-default"],
+        "configure-options": [
+            {
+                "name": "enable-colopl_bc",
+                "description": "Whether to enable colopl_bc backwards compatibility support"
+            }
+        ]
     },
     "license": "PHP-3.01",
     "authors": [

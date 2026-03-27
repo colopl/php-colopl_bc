@@ -98,5 +98,5 @@ jobs:
       - name: Upload artifact to the release
         uses: php/php-windows-builder/release@e0e01747e758fc325cb6591b904589b11a0ea4c8 # v1.7.0
         with:
-          release: ${{ github.event.release.tag_name }}
+          release: ${{ github.ref_name }}
           token: ${{ secrets.GITHUB_TOKEN }}

@@ -42,7 +42,6 @@ jobs:
         with:
           name: initialized-ext-coverage
           path: ext/
-          archive: false
           retention-days: 1
   coverage:
     needs: init

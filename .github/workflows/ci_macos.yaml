@@ -40,7 +40,6 @@ jobs:
         with:
           name: initialized-ext-macos
           path: ext/
-          archive: false
           retention-days: 1
   macOS:
     needs: init

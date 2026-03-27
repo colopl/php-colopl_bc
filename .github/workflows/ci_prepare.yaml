@@ -32,5 +32,4 @@ jobs:
         with:
           name: ${{ steps.metadata.outputs.artifact_name }}
           path: .
-          archive: false
           retention-days: 1

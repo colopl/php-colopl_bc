@@ -70,7 +70,7 @@ jobs:
           fetch-depth: 1
       - name: Get the extension matrix
         id: extension-matrix
-        uses: php/php-windows-builder/extension-matrix@e0e01747e758fc325cb6591b904589b11a0ea4c8 # v1.7.0
+        uses: php/php-windows-builder/extension-matrix@e03e5d39879adaeb61ed2225f0f4eae7db8c1df8 # 1.8.1
         with:
           php-version-list: '8.1,8.2,8.3,8.4,8.5'
   BuildWindows:
@@ -91,7 +91,7 @@ jobs:
         shell: pwsh
         run: Copy-Item -Path ext\* -Destination . -Recurse -Force
       - name: Build the extension
-        uses: php/php-windows-builder/extension@e0e01747e758fc325cb6591b904589b11a0ea4c8 # v1.7.0
+        uses: php/php-windows-builder/extension@e03e5d39879adaeb61ed2225f0f4eae7db8c1df8 # 1.8.1
         with:
           php-version: ${{ matrix.php-version }}
           arch: ${{ matrix.arch }}
@@ -103,7 +103,7 @@ jobs:
       contents: write
     steps:
       - name: Upload artifact to the release
-        uses: php/php-windows-builder/release@e0e01747e758fc325cb6591b904589b11a0ea4c8 # v1.7.0
+        uses: php/php-windows-builder/release@e03e5d39879adaeb61ed2225f0f4eae7db8c1df8 # 1.8.1
         with:
           release: ${{ github.ref_name }}
           token: ${{ secrets.GITHUB_TOKEN }}

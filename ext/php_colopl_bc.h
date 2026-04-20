@@ -48,7 +48,7 @@ ZEND_BEGIN_MODULE_GLOBALS(colopl_bc)
 	bool rand_is_seeded;
 	bool mt_rand_is_seeded;
 	uint32_t rand_seed;
-	uint32_t mt_state[N+1];
+	uint32_t mt_state[COLOPL_BC_MT_N+1];
 	uint32_t *mt_next;
 	int mt_left;
 	int gnurandom_r[344];

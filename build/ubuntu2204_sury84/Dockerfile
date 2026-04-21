@@ -18,8 +18,7 @@ RUN apt-get update && \
     rm -rf /var/lib/apt/lists/*
 
 COPY ./ext /tmp/src/ext
-COPY ./LICENSE /tmp/src/LICENSE
-COPY ./README.md /tmp/src/README.md
+
 COPY ./build/ubuntu2204_sury84/debian /tmp/build/ubuntu2204_sury84/debian
 
 COPY ./build/ubuntu2204_sury84/build.sh /usr/bin/build

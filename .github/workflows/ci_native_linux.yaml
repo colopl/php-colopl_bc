@@ -62,9 +62,9 @@ jobs:
           docker compose build --no-cache --build-arg IMAGE="php" --build-arg TAG="${{ matrix.version }}-${{ matrix.type }}-${{ matrix.distro }}"
       - name: Test extension with Bundled PHP
         run: docker compose run --rm -v "$(pwd)/php-cache:/opt/php-cache" -e PHP_CACHE_DIR="/opt/php-cache" -e GITHUB_ACTIONS="true" -e CONTAINER_IMAGE_HASH="${{ steps.pull-image.outputs.image_hash }}" shell pskel test
-      - name: Test extension with PHP Debug Build
+      - name: Test extension with PHP Debug Build (in-tree static)
         if: matrix.version != '8.1'
-        run: docker compose run --rm -v "$(pwd)/php-cache:/opt/php-cache" -e PHP_CACHE_DIR="/opt/php-cache" -e GITHUB_ACTIONS="true" -e CONTAINER_IMAGE_HASH="${{ steps.pull-image.outputs.image_hash }}" shell pskel test debug
+        run: docker compose run --rm -v "$(pwd)/php-cache:/opt/php-cache" -e PHP_CACHE_DIR="/opt/php-cache" -e GITHUB_ACTIONS="true" -e CONTAINER_IMAGE_HASH="${{ steps.pull-image.outputs.image_hash }}" shell pskel test debug-static
       - name: Test extension with Valgrind
         if: matrix.distro != 'alpine' && matrix.version != '8.1'
         run: docker compose run --rm -v "$(pwd)/php-cache:/opt/php-cache" -e PHP_CACHE_DIR="/opt/php-cache" -e GITHUB_ACTIONS="true" -e CONTAINER_IMAGE_HASH="${{ steps.pull-image.outputs.image_hash }}" shell pskel test valgrind

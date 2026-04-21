@@ -3,15 +3,9 @@
   | COLOPL PHP Backwards Compatibility Extension.                        |
   +----------------------------------------------------------------------+
   | Copyright (c) COLOPL, Inc.                                           |
-  | Copyright (c) The PHP Group                                          |
   +----------------------------------------------------------------------+
-  | This source file is subject to version 3.01 of the PHP license,      |
-  | that is bundled with this package in the file LICENSE, and is        |
-  | available through the world-wide-web at the following url:           |
-  | http://www.php.net/license/3_01.txt                                  |
-  | If you did not receive a copy of the PHP license and are unable to   |
-  | obtain it through the world-wide-web, please send a note to          |
-  | license@php.net so we can mail you a copy immediately.               |
+  | This source file is subject to the BSD-3-Clause license that is      |
+  | bundled with this package in the file LICENSE.                       |
   +----------------------------------------------------------------------+
   | Author: Go Kudo <g-kudo@colopl.co.jp>                                |
   +----------------------------------------------------------------------+
@@ -31,13 +25,18 @@
 
 #define COLOPL_BC_TYPE_PAIR(t1,t2) (((t1) << 4) | (t2))
 
-#define php_colopl_bc_convert_object_to_type(op, dst, ctype)									\
-	ZVAL_UNDEF(dst);																			\
-	if (Z_OBJ_HT_P(op)->cast_object(Z_OBJ_P(op), dst, ctype) == FAILURE) {						\
-		zend_error(E_WARNING,																	\
-			"Object of class %s could not be converted to %s", ZSTR_VAL(Z_OBJCE_P(op)->name),	\
-		zend_get_type_by_const(ctype));															\
-	} 																							\
+static inline void php_colopl_bc_convert_object_to_type(zval *op, zval *dst, uint32_t ctype)
+{
+	ZVAL_UNDEF(dst);
+	if (Z_OBJ_HT_P(op)->cast_object(Z_OBJ_P(op), dst, ctype) == FAILURE) {
+		zend_error(
+			E_WARNING,
+			"Object of class %s could not be converted to %s",
+			ZSTR_VAL(Z_OBJCE_P(op)->name),
+			zend_get_type_by_const(ctype)
+		);
+	}
+}
 
 static zend_never_inline zval* ZEND_FASTCALL _php_colopl_bc_zendi_convert_scalar_to_number_silent(zval *op, zval *holder)
 {

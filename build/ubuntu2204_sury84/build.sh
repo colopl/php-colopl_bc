@@ -1,19 +1,19 @@
 #!/bin/sh -eux
 
-cd "/tmp/ext"
-  echo "COLOPL PHP backwards compatibility extension for sury PHP 8.4" > "description-pak"
-  phpize8.4
-  ./configure --with-php-config="$(which "php-config8.4")"
-  make -j"$(nproc)"
-  TEST_PHP_ARGS="--show-diff -q" make test
-  checkinstall \
-        --pkgname="php8.4-colopl-bc" \
-        --pkglicense="PHP-3.01" \
-        --pkgversion="${VERSION}" \
-        --pkggroup="php8.4" \
-        --maintainer="g-kudo@colopl.co.jp" \
-        --requires="php8.4-common" \
-        --stripso="yes" \
-        --pakdir="/tmp/artifacts" \
-        --nodoc
-cd -
+: "${VERSION:?VERSION is required}"
+
+SOURCE_DIR="/tmp/src"
+PACKAGING_DIR="/tmp/build/ubuntu2204_sury84/debian"
+ARTIFACTS_DIR="/tmp/artifacts"
+
+rm -rf "${SOURCE_DIR}/debian"
+install -d "${SOURCE_DIR}/debian" "${ARTIFACTS_DIR}"
+find "${ARTIFACTS_DIR}" -mindepth 1 -maxdepth 1 -delete
+
+cp -a "${PACKAGING_DIR}/." "${SOURCE_DIR}/debian/"
+sed "s/@VERSION@/${VERSION}/g" "${PACKAGING_DIR}/changelog.in" > "${SOURCE_DIR}/debian/changelog"
+rm -f "${SOURCE_DIR}/debian/changelog.in"
+
+cd "${SOURCE_DIR}"
+dpkg-buildpackage -us -uc -b
+find /tmp -maxdepth 1 -type f \( -name '*.deb' -o -name '*.buildinfo' -o -name '*.changes' \) -exec cp {} "${ARTIFACTS_DIR}/" \;

@@ -111,7 +111,7 @@ final class PHP70Test extends AbstractTestCase
 
     public function testMtSRandNull(): void
     {
-        /* PHP 8.1 does not support null -> 0 auto casting. */
+        /* Keep the legacy null-to-zero cast explicit across supported runtimes. */
         $seed = (int) \null;
 
         \Colopl\ColoplBc\Php70\mt_srand($seed);

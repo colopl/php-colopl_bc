@@ -2,7 +2,9 @@
 /ext/*~
 /vendor
 /artifacts
+/.idea
 *.DS_Store
 lcov.info
+.phpunit.cache
 .phpunit.result.cache
 composer.lock

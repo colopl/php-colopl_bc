@@ -7,10 +7,10 @@ Provides various compatibility functions required for PHP (temporary) migration.
 
 ## Supported Versions
 
-- Extension: PHP >= 8.0, 8.5 >= PHP
-- Library: PHP >= 7.4, 8.5 >= PHP
+- Extension: PHP >= 8.1, 8.5 >= PHP
+- Library: PHP == 7.4 or PHP >= 8.1, 8.5 >= PHP
 
-Library is introduced for migration to PHP 8.x with the same code base. If you do not need to work with the same code base, you can use only the Extension.
+Library is introduced for migration from PHP 7.4 to PHP 8.1+ with the same code base. PHP 8.0 is not supported. If you do not need to work with the same code base, you can use only the Extension.
 
 ## Usage
 
@@ -36,6 +36,31 @@ $ echo "extension=colopl_bc" | sudo tee "$(php-config --ini-dir)/10-colopl_bc.in
 $ php -m | grep "colopl_bc"
 colopl_bc
 ```
+
+### Build Ubuntu 22.04 packages
+
+Ubuntu 22.04 packages are built with standard Debian packaging via `dpkg-buildpackage`, not `checkinstall`.
+The packaging definitions live alongside each build target under `build/ubuntu2204/debian` and `build/ubuntu2204_sury84/debian`.
+
+Build packages for the official Ubuntu 22.04 PHP 8.1 stack:
+
+```bash
+$ docker build -f "build/ubuntu2204/Dockerfile" -t "colopl-bc-u2204-php81" .
+$ mkdir -p "artifacts"
+$ docker run --rm -e VERSION="12.0.0" -v "$(pwd)/artifacts:/tmp/artifacts" "colopl-bc-u2204-php81"
+```
+
+This target produces `php-colopl-bc` and `php8.1-colopl-bc` binary packages together with the corresponding `.changes` and `.buildinfo` files.
+
+Build packages for Ubuntu 22.04 with the Ondrej Sury PHP 8.4 repository:
+
+```bash
+$ docker build -f "build/ubuntu2204_sury84/Dockerfile" -t "colopl-bc-u2204-php84" .
+$ mkdir -p "artifacts"
+$ docker run --rm -e VERSION="12.0.0" -v "$(pwd)/artifacts:/tmp/artifacts" "colopl-bc-u2204-php84"
+```
+
+This target produces the `php8.4-colopl-bc` binary package together with the corresponding `.changes` and `.buildinfo` files.
 
 The library is installed in the following steps.
 
@@ -212,3 +237,7 @@ Generate random numbers.
 - `Colopl\ColoplBc\Php70\date_create_immutable()`
 
 Always instantiate DateTime without milliseconds.
+
+## License
+
+This project is licensed under the BSD-3-Clause license. See [LICENSE](LICENSE).

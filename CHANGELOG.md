@@ -1,4 +1,14 @@
-# 11.1.0 
+# 12.0.0
+- Change the project license from PHP-3.01 to BSD-3-Clause
+- Tighten package support to PHP 7.4 or PHP 8.1+
+- Refactor internals toward PHP 8.1+ APIs
+- Replace checkinstall-based Ubuntu 22.04 packaging with standard Debian package builds
+- Restore tag-triggered GitHub Actions builds for Ubuntu 22.04 deb packages
+- Fix in-source build on PHP 8.5 and later (#70)
+- Improve `.deb` build from upstream method (#18)
+- Official support for PIE
+
+# 11.1.0
 - Add Windows and macOS support
 - Bump Pskel 2.0.0
 - Fix SEGV on date_create, date_create_immutable (#30, https://github.com/colopl/php-colopl_bc/issues/30)

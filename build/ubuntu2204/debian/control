@@ -1,0 +1,32 @@
+Source: php-colopl-bc
+Section: php
+Priority: optional
+Maintainer: Go Kudo <g-kudo@colopl.co.jp>
+Homepage: https://github.com/colopl/php-colopl_bc
+Standards-Version: 4.6.2
+Rules-Requires-Root: no
+Build-Depends:
+ debhelper-compat (= 13),
+ php8.1-cli,
+ php8.1-dev
+
+Package: php-colopl-bc
+Section: php
+Architecture: all
+Depends:
+ ${misc:Depends},
+ php8.1-colopl-bc
+Description: Meta package for the COLOPL backwards compatibility extension
+ This package depends on the Ubuntu 22.04 build of the colopl_bc extension
+ for PHP 8.1.
+
+Package: php8.1-colopl-bc
+Section: php
+Architecture: any
+Depends:
+ ${misc:Depends},
+ ${shlibs:Depends},
+ php8.1-common
+Description: COLOPL backwards compatibility extension for PHP 8.1
+ The colopl_bc extension provides compatibility helpers that support staged
+ migrations from older PHP behavior to PHP 8.1 and later.

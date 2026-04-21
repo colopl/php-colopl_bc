@@ -3,15 +3,9 @@
   | COLOPL PHP Backwards Compatibility Extension.                        |
   +----------------------------------------------------------------------+
   | Copyright (c) COLOPL, Inc.                                           |
-  | Copyright (c) The PHP Group                                          |
   +----------------------------------------------------------------------+
-  | This source file is subject to version 3.01 of the PHP license,      |
-  | that is bundled with this package in the file LICENSE, and is        |
-  | available through the world-wide-web at the following url:           |
-  | http://www.php.net/license/3_01.txt                                  |
-  | If you did not receive a copy of the PHP license and are unable to   |
-  | obtain it through the world-wide-web, please send a note to          |
-  | license@php.net so we can mail you a copy immediately.               |
+  | This source file is subject to the BSD-3-Clause license that is      |
+  | bundled with this package in the file LICENSE.                       |
   +----------------------------------------------------------------------+
   | Author: Go Kudo <g-kudo@colopl.co.jp>                                |
   +----------------------------------------------------------------------+
@@ -25,6 +19,76 @@
 
 #include "ext/date/php_date.h"
 #include "zend_bitset.h"
+
+#ifndef RAND_MAX
+# define RAND_MAX (1 << 15)
+#endif
+
+#if !defined(ZTS) && (defined(HAVE_LRAND48) || defined(HAVE_RANDOM))
+enum {
+	COLOPL_BC_RAND_MAX_VALUE = 2147483647,
+	COLOPL_BC_MT_M = 397,
+	COLOPL_BC_MT_RAND_MAX_VALUE = 0x7FFFFFFF
+};
+#else
+enum {
+	COLOPL_BC_RAND_MAX_VALUE = RAND_MAX,
+	COLOPL_BC_MT_M = 397,
+	COLOPL_BC_MT_RAND_MAX_VALUE = 0x7FFFFFFF
+};
+#endif
+
+/* Emulate gcc + amd64 undefined behavior results. */
+static inline zend_long php_colopl_bc_float_to_long_amd64(zend_long min, double value)
+{
+	if (value > ((double) ZEND_LONG_MAX) || value < ((double) ZEND_LONG_MIN)) {
+		return 0;
+	}
+
+	return min + (zend_long) value;
+}
+
+static inline zend_long php_colopl_bc_rand_range(zend_long number, zend_long min, zend_long max, zend_long rand_max)
+{
+	return php_colopl_bc_float_to_long_amd64(
+		min,
+		((double) max - (double) min + 1.0) * ((double) number / ((double) rand_max + 1.0))
+	);
+}
+
+static inline zend_long php_colopl_bc_generate_seed(void)
+{
+#ifdef PHP_WIN32
+	return (((zend_long) (time(0) * GetCurrentProcessId())) ^ ((zend_long) (1000000.0 * php_combined_lcg())));
+#else
+	return (((zend_long) (time(0) * getpid())) ^ ((zend_long) (1000000.0 * php_combined_lcg())));
+#endif
+}
+
+static inline uint32_t php_colopl_bc_mt_hi_bit(uint32_t value)
+{
+	return value & 0x80000000U;
+}
+
+static inline uint32_t php_colopl_bc_mt_lo_bit(uint32_t value)
+{
+	return value & 0x00000001U;
+}
+
+static inline uint32_t php_colopl_bc_mt_lo_bits(uint32_t value)
+{
+	return value & 0x7FFFFFFFU;
+}
+
+static inline uint32_t php_colopl_bc_mt_mix_bits(uint32_t left, uint32_t right)
+{
+	return php_colopl_bc_mt_hi_bit(left) | php_colopl_bc_mt_lo_bits(right);
+}
+
+static inline uint32_t php_colopl_bc_mt_twist(uint32_t m, uint32_t u, uint32_t v)
+{
+	return m ^ (php_colopl_bc_mt_mix_bits(u, v) >> 1) ^ ((uint32_t) (-(uint32_t) php_colopl_bc_mt_lo_bit(u)) & 0x9908b0dfU);
+}
 
 /* rand.c */
 
@@ -70,7 +134,7 @@ zend_long php_colopl_bc_rand(void)
 	zend_long ret;
 
 	if (!COLOPL_BC_G(rand_is_seeded)) {
-		php_colopl_bc_srand(COLOPL_BC_GENERATE_SEED());
+		php_colopl_bc_srand(php_colopl_bc_generate_seed());
 	}
 
 #ifdef ZTS
@@ -106,7 +170,7 @@ PHP_FUNCTION(Colopl_ColoplBc_Php70_srand)
 	ZEND_PARSE_PARAMETERS_END();
 
 	if (ZEND_NUM_ARGS() == 0) {
-		seed = COLOPL_BC_GENERATE_SEED();
+		seed = php_colopl_bc_generate_seed();
 	}
 
 	php_colopl_bc_srand(seed);
@@ -129,7 +193,7 @@ PHP_FUNCTION(Colopl_ColoplBc_Php70_rand)
 		Z_PARAM_LONG(max)
 	ZEND_PARSE_PARAMETERS_END();
 
-	PHP_COLOPL_BC_RAND_RANGE(number, min, max, PHP_COLOPL_BC_RAND_MAX);
+	number = php_colopl_bc_rand_range(number, min, max, COLOPL_BC_RAND_MAX_VALUE);
 	RETURN_LONG(number);
 }
 
@@ -137,7 +201,7 @@ PHP_FUNCTION(Colopl_ColoplBc_Php70_getrandmax)
 {
 	ZEND_PARSE_PARAMETERS_NONE();
 
-	RETURN_LONG(PHP_COLOPL_BC_RAND_MAX);
+	RETURN_LONG(COLOPL_BC_RAND_MAX_VALUE);
 }
 
 /* mt_rand.c */
@@ -149,7 +213,7 @@ static inline void mt_initialize(uint32_t seed, uint32_t *state)
 	register int i = 1;
 
 	*s++ = seed & 0xffffffffU;
-	for (; i < N; ++i) {
+	for (; i < COLOPL_BC_MT_N; ++i) {
 		*s++ = ( 1812433253U * ( *r ^ (*r >> 30) ) + i ) & 0xffffffffU;
 		r++;
 	}
@@ -161,14 +225,14 @@ static inline void mt_reload(void)
 	register uint32_t *p = state;
 	register int i;
 
-	for (i = N - M; i--; ++p) {
-		*p = twist(p[M], p[0], p[1]);
+	for (i = COLOPL_BC_MT_N - COLOPL_BC_MT_M; i--; ++p) {
+		*p = php_colopl_bc_mt_twist(p[COLOPL_BC_MT_M], p[0], p[1]);
 	}
-	for (i = M; --i; ++p) {
-		*p = twist(p[M-N], p[0], p[1]);
+	for (i = COLOPL_BC_MT_M; --i; ++p) {
+		*p = php_colopl_bc_mt_twist(p[COLOPL_BC_MT_M - COLOPL_BC_MT_N], p[0], p[1]);
 	}
-	*p = twist(p[M-N], p[0], state[0]);
-	COLOPL_BC_G(mt_left) = N;
+	*p = php_colopl_bc_mt_twist(p[COLOPL_BC_MT_M - COLOPL_BC_MT_N], p[0], state[0]);
+	COLOPL_BC_G(mt_left) = COLOPL_BC_MT_N;
 	COLOPL_BC_G(mt_next) = state;
 }
 
@@ -206,7 +270,7 @@ PHP_FUNCTION(Colopl_ColoplBc_Php70_mt_srand)
 	ZEND_PARSE_PARAMETERS_END();
 
 	if (ZEND_NUM_ARGS() == 0) {
-		seed = COLOPL_BC_GENERATE_SEED();
+		seed = php_colopl_bc_generate_seed();
 	}
 
 	php_colopl_bc_mt_srand((uint32_t) seed);
@@ -219,7 +283,7 @@ PHP_FUNCTION(Colopl_ColoplBc_Php70_mt_rand)
 
 	if (argc == 0) {
 		if (!COLOPL_BC_G(mt_rand_is_seeded)) {
-			php_colopl_bc_mt_srand(COLOPL_BC_GENERATE_SEED());
+			php_colopl_bc_mt_srand(php_colopl_bc_generate_seed());
 		}
 		RETURN_LONG(php_colopl_bc_mt_rand() >> 1);
 	}
@@ -235,11 +299,11 @@ PHP_FUNCTION(Colopl_ColoplBc_Php70_mt_rand)
 	}
 
 	if (!COLOPL_BC_G(mt_rand_is_seeded)) {
-		php_colopl_bc_mt_srand(COLOPL_BC_GENERATE_SEED());
+		php_colopl_bc_mt_srand(php_colopl_bc_generate_seed());
 	}
 
 	number = (zend_long) (php_colopl_bc_mt_rand() >> 1);
-	PHP_COLOPL_BC_RAND_RANGE(number, min, max, PHP_COLOPL_BC_MT_RAND_MAX);
+	number = php_colopl_bc_rand_range(number, min, max, COLOPL_BC_MT_RAND_MAX_VALUE);
 	RETURN_LONG(number);
 }
 
@@ -247,7 +311,7 @@ PHP_FUNCTION(Colopl_ColoplBc_Php70_mt_getrandmax)
 {
 	ZEND_PARSE_PARAMETERS_NONE();
 
-	RETURN_LONG(PHP_COLOPL_BC_MT_RAND_MAX);
+	RETURN_LONG(COLOPL_BC_MT_RAND_MAX_VALUE);
 }
 
 /* array.c */
@@ -283,7 +347,7 @@ void php_colopl_bc_array_data_shuffle(zval *array)
 		}
 		while (--n_left) {
 			rnd_idx = php_colopl_bc_rand();
-			PHP_COLOPL_BC_RAND_RANGE(rnd_idx, 0, n_left, PHP_COLOPL_BC_RAND_MAX);
+			rnd_idx = php_colopl_bc_rand_range(rnd_idx, 0, n_left, COLOPL_BC_RAND_MAX_VALUE);
 			if (rnd_idx != n_left) {
 				temp = hash->arData[n_left];
 				hash->arData[n_left] = hash->arData[rnd_idx];
@@ -309,7 +373,7 @@ void php_colopl_bc_array_data_shuffle(zval *array)
 		}
 		while (--n_left) {
 			rnd_idx = php_colopl_bc_rand();
-			PHP_COLOPL_BC_RAND_RANGE(rnd_idx, 0, n_left, PHP_COLOPL_BC_RAND_MAX);
+			rnd_idx = php_colopl_bc_rand_range(rnd_idx, 0, n_left, COLOPL_BC_RAND_MAX_VALUE);
 			if (rnd_idx != n_left) {
 				temp = hash->arData[n_left];
 				hash->arData[n_left] = hash->arData[rnd_idx];
@@ -380,7 +444,7 @@ void php_colopl_bc_array_data_shuffle(zval *array)
 		}
 		while (--n_left) {
 			rnd_idx = php_colopl_bc_rand();
-			PHP_COLOPL_BC_RAND_RANGE(rnd_idx, 0, n_left, PHP_COLOPL_BC_RAND_MAX);
+			rnd_idx = php_colopl_bc_rand_range(rnd_idx, 0, n_left, COLOPL_BC_RAND_MAX_VALUE);
 			if (rnd_idx != n_left) {
 				ZVAL_COPY_VALUE(&temp, &hash->arPacked[n_left]);
 				ZVAL_COPY_VALUE(&hash->arPacked[n_left], &hash->arPacked[rnd_idx]);
@@ -406,7 +470,7 @@ void php_colopl_bc_array_data_shuffle(zval *array)
 		}
 		while (--n_left) {
 			rnd_idx = php_colopl_bc_rand();
-			PHP_COLOPL_BC_RAND_RANGE(rnd_idx, 0, n_left, PHP_COLOPL_BC_RAND_MAX);
+			rnd_idx = php_colopl_bc_rand_range(rnd_idx, 0, n_left, COLOPL_BC_RAND_MAX_VALUE);
 			if (rnd_idx != n_left) {
 				ZVAL_COPY_VALUE(&temp, &hash->arPacked[n_left]);
 				ZVAL_COPY_VALUE(&hash->arPacked[n_left], &hash->arPacked[rnd_idx]);
@@ -470,7 +534,7 @@ PHP_FUNCTION(Colopl_ColoplBc_Php70_array_rand)
 
 		randval = php_colopl_bc_rand();
 
-		if ((double) (randval / (PHP_COLOPL_BC_RAND_MAX + 1.0)) < (double) num_req / (double) num_avail) {
+		if ((double) randval / ((double) COLOPL_BC_RAND_MAX_VALUE + 1.0) < (double) num_req / (double) num_avail) {
 			/* If we are returning a single result, just do it. */
 			if (Z_TYPE_P(return_value) != IS_ARRAY) {
 				if (string_key) {
@@ -509,7 +573,7 @@ void php_colopl_bc_string_shuffle(char *str, zend_long len)
 
 	while (--n_left) {
 		rnd_idx = php_colopl_bc_rand();
-		PHP_COLOPL_BC_RAND_RANGE(rnd_idx, 0, n_left, PHP_COLOPL_BC_RAND_MAX);
+		rnd_idx = php_colopl_bc_rand_range(rnd_idx, 0, n_left, COLOPL_BC_RAND_MAX_VALUE);
 		if (rnd_idx != n_left) {
 			temp = str[n_left];
 			str[n_left] = str[rnd_idx];
@@ -534,30 +598,46 @@ PHP_FUNCTION(Colopl_ColoplBc_Php70_str_shuffle)
 
 PHP_FUNCTION(Colopl_ColoplBc_Php70_date_create)
 {
-	zend_function *fn;
+	zval *timezone_object = NULL;
+	char *time_str = NULL;
+	size_t time_str_len = 0;
 	php_date_obj *date;
 
-	fn = zend_hash_str_find_ptr(CG(function_table), "date_create", strlen("date_create"));
-	ZEND_ASSERT(fn);
-	fn->internal_function.handler(INTERNAL_FUNCTION_PARAM_PASSTHRU);
+	ZEND_PARSE_PARAMETERS_START(0, 2)
+		Z_PARAM_OPTIONAL
+		Z_PARAM_STRING(time_str, time_str_len)
+		Z_PARAM_OBJECT_OF_CLASS_OR_NULL(timezone_object, php_date_get_timezone_ce())
+	ZEND_PARSE_PARAMETERS_END();
 
-	if (Z_TYPE_P(return_value) != IS_FALSE) {
-		date = Z_PHPDATE_P(return_value);
-		date->time->us = 0;
+	php_date_instantiate(php_date_get_date_ce(), return_value);
+	if (!php_date_initialize(Z_PHPDATE_P(return_value), time_str, time_str_len, NULL, timezone_object, 0)) {
+		zval_ptr_dtor(return_value);
+		RETURN_FALSE;
 	}
+
+	date = Z_PHPDATE_P(return_value);
+	date->time->us = 0;
 }
 
 PHP_FUNCTION(Colopl_ColoplBc_Php70_date_create_immutable)
 {
-	zend_function *fn;
+	zval *timezone_object = NULL;
+	char *time_str = NULL;
+	size_t time_str_len = 0;
 	php_date_obj *date;
 
-	fn = zend_hash_str_find_ptr(CG(function_table), "date_create_immutable", strlen("date_create_immutable"));
-	ZEND_ASSERT(fn);
-	fn->internal_function.handler(INTERNAL_FUNCTION_PARAM_PASSTHRU);
+	ZEND_PARSE_PARAMETERS_START(0, 2)
+		Z_PARAM_OPTIONAL
+		Z_PARAM_STRING(time_str, time_str_len)
+		Z_PARAM_OBJECT_OF_CLASS_OR_NULL(timezone_object, php_date_get_timezone_ce())
+	ZEND_PARSE_PARAMETERS_END();
 
-	if (Z_TYPE_P(return_value) != IS_FALSE) {
-		date = Z_PHPDATE_P(return_value);
-		date->time->us = 0;
+	php_date_instantiate(php_date_get_immutable_ce(), return_value);
+	if (!php_date_initialize(Z_PHPDATE_P(return_value), time_str, time_str_len, NULL, timezone_object, 0)) {
+		zval_ptr_dtor(return_value);
+		RETURN_FALSE;
 	}
+
+	date = Z_PHPDATE_P(return_value);
+	date->time->us = 0;
 }

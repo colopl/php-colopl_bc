@@ -36,7 +36,7 @@
             }
         ]
     },
-    "license": "PHP-3.01",
+    "license": "BSD-3-Clause",
     "authors": [
         {
             "name": "Go Kudo",

@@ -1,0 +1,32 @@
+#!/usr/bin/make -f
+
+PHPIZE = phpize8.4
+PHP_CONFIG = php-config8.4
+PHP_VERSION = 8.4
+BINARY_PACKAGE = php8.4-colopl-bc
+
+export DEB_BUILD_MAINT_OPTIONS = hardening=+all
+
+%:
+	dh $@
+
+override_dh_auto_configure:
+	cd ext && $(PHPIZE)
+	cd ext && ./configure --with-php-config="$$(command -v $(PHP_CONFIG))"
+
+override_dh_auto_build:
+	$(MAKE) -C ext -j$(shell nproc)
+
+override_dh_auto_test:
+	cd ext && TEST_PHP_ARGS="--show-diff -q" $(MAKE) test
+
+override_dh_auto_install:
+	extdir="$$( $(PHP_CONFIG) --extension-dir )"; \
+	pkgdir="$(CURDIR)/debian/$(BINARY_PACKAGE)"; \
+	install -d "$$pkgdir$$extdir" "$$pkgdir/etc/php/$(PHP_VERSION)/mods-available"; \
+	install -m 0644 ext/modules/colopl_bc.so "$$pkgdir$$extdir/colopl_bc.so"; \
+	printf '%s\n' '; priority=20' 'extension=colopl_bc' > "$$pkgdir/etc/php/$(PHP_VERSION)/mods-available/colopl_bc.ini"
+
+override_dh_auto_clean:
+	if [ -f ext/Makefile ]; then $(MAKE) -C ext clean || true; fi
+	rm -rf ext/modules ext/autom4te.cache

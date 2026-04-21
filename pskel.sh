@@ -19,6 +19,140 @@ get_ext_dir() {
   echo "${PSKEL_EXT_DIR}"
 }
 
+get_in_tree_ext_dir() {
+  echo "/usr/src/php/ext/colopl_bc"
+}
+
+sync_ext_into_php_source() {
+  SOURCE_DIR="${1}"
+  TARGET_DIR="$(get_in_tree_ext_dir)"
+
+  rm -rf "${TARGET_DIR}"
+  mkdir -p "${TARGET_DIR}"
+
+  rsync -a \
+    --exclude ".git/" \
+    --exclude "autom4te.cache/" \
+    --exclude "build/" \
+    --exclude "modules/" \
+    --exclude "*.dep" \
+    --exclude "*.la" \
+    --exclude "*.lo" \
+    --exclude "*.o" \
+    --exclude "Makefile" \
+    --exclude "Makefile.fragments" \
+    --exclude "Makefile.global" \
+    --exclude "Makefile.objects" \
+    --exclude "config.h" \
+    --exclude "config.h.in" \
+    --exclude "config.nice" \
+    --exclude "config.status" \
+    --exclude "configure" \
+    --exclude "configure.ac" \
+    --exclude "libtool" \
+    --exclude "run-tests.php" \
+    --exclude "*~" \
+    "${SOURCE_DIR}/" "${TARGET_DIR}/"
+
+  echo "${TARGET_DIR}"
+}
+
+generate_ext_source_hash() {
+  SOURCE_DIR="${1}"
+
+  (
+    cd "${SOURCE_DIR}"
+    find . \
+      \( -path "./autom4te.cache" -o -path "./autom4te.cache/*" -o -path "./build" -o -path "./build/*" -o -path "./modules" -o -path "./modules/*" \) -prune -o \
+      -type f \
+      ! -name "*.dep" \
+      ! -name "*.la" \
+      ! -name "*.lo" \
+      ! -name "*.o" \
+      ! -name "Makefile" \
+      ! -name "Makefile.fragments" \
+      ! -name "Makefile.global" \
+      ! -name "Makefile.objects" \
+      ! -name "config.h" \
+      ! -name "config.h.in" \
+      ! -name "config.nice" \
+      ! -name "config.status" \
+      ! -name "configure" \
+      ! -name "configure.ac" \
+      ! -name "libtool" \
+      ! -name "run-tests.php" \
+      ! -name "*~" \
+      -print \
+    | LC_ALL=C sort \
+    | while IFS= read -r FILE; do
+        sha256sum "${FILE}"
+      done \
+    | sha256sum \
+    | cut -d' ' -f1 \
+    | cut -c1-16
+  )
+}
+
+get_php_build_key_file() {
+  echo "/usr/local/include/${1}-php/.pskel-build-key"
+}
+
+php_build_is_current() {
+  PREFIX="${1}"
+  BUILD_KEY="${2}"
+  BUILD_KEY_FILE="$(get_php_build_key_file "${PREFIX}")"
+
+  if ! test -x "/usr/local/bin/${PREFIX}-php"; then
+    return 1
+  fi
+
+  if ! test -f "${BUILD_KEY_FILE}"; then
+    return 1
+  fi
+
+  test "$(cat "${BUILD_KEY_FILE}")" = "${BUILD_KEY}"
+}
+
+mark_php_build() {
+  PREFIX="${1}"
+  BUILD_KEY="${2}"
+  INCLUDE_DIR="/usr/local/include/${PREFIX}-php"
+
+  if ! test -d "${INCLUDE_DIR}"; then
+    mkdir -p "${INCLUDE_DIR}"
+  fi
+
+  printf '%s\n' "${BUILD_KEY}" > "${INCLUDE_DIR}/.pskel-build-key"
+}
+
+clear_php_build() {
+  PREFIX="${1}"
+
+  rm -f "/usr/local/bin/${PREFIX}-php" "/usr/local/bin/${PREFIX}-phpize" "/usr/local/bin/${PREFIX}-php-config"
+  rm -rf "/usr/local/include/${PREFIX}-php"
+}
+
+run_in_tree_static_tests() {
+  PHP_BIN="${1}"
+  TESTS_DIR="${2}"
+
+  if ! "${PHP_BIN}" -m | grep -qx "colopl_bc"; then
+    echo "Error: colopl_bc is not built into ${PHP_BIN}" >&2
+    return 1
+  fi
+
+  (
+    if test -n "${TEST_PHP_ARGS}"; then
+      eval "set -- ${TEST_PHP_ARGS}"
+    else
+      set --
+    fi
+
+    set -- "$@" --show-diff -q -p "${PHP_BIN}" "${TESTS_DIR}"
+    "${PHP_BIN}" "/usr/src/php/run-tests.php" "$@"
+  )
+}
+
 cmd_usage() {
     cat << EOF
 Usage: ${0} [task] ...
@@ -66,11 +200,23 @@ cmd_test() {
   case "${1}" in
     -h|--help)
       cat << EOF
-Usage: ${0} test [test_type|php_binary_name]
+Usage: ${0} test [debug|debug-static|gcov|valgrind|msan|asan|ubsan|php_binary_name]
 Environment variables:
   CFLAGS, CPPFLAGS:     Compilation flags
   TEST_PHP_ARGS:        Test flags
 EOF
+      return 0
+      ;;
+    debug-static)
+      CC="$(command -v "gcc")"
+      CXX="$(command -v "g++")"
+      PSKEL_EXT_DIR="$(get_ext_dir)"
+      sync_ext_into_php_source "${PSKEL_EXT_DIR}" >/dev/null
+      CACHE_KEY_SUFFIX="$(generate_ext_source_hash "${PSKEL_EXT_DIR}")"
+      CONFIGURE_OPTS="${CONFIGURE_OPTS} --enable-colopl_bc"
+      build_php_if_not_exists "debug-static"
+      CMD="$(basename "${CC}")-debug-static-php"
+      run_in_tree_static_tests "$(command -v "${CMD}")" "$(get_in_tree_ext_dir)/tests"
       return 0
       ;;
     debug|gcov|valgrind)
@@ -148,36 +294,41 @@ EOF
 
 build_php_if_not_exists() {
   PREFIX="$(basename "${CC}")-${1}"
+  BUILD_KEY="$(generate_cache_key "${1}" "${CC}")"
 
-  if test -n "${GITHUB_ACTIONS}" && test -d "${PHP_CACHE_DIR}"; then
-    if check_and_restore_cached_php "${PREFIX}" "${1}" "${CC}" "${CONFIGURE_OPTS}"; then
-      return 0
-    fi
+  if php_build_is_current "${PREFIX}" "${BUILD_KEY}"; then
+    return 0
   fi
 
-  if ! command -v "${PREFIX}-php" >/dev/null 2>&1; then
-    CC="${CC}" \
-    CXX="${CXX}" \
-    CFLAGS="-DZEND_TRACK_ARENA_ALLOC" \
-    CPPFLAGS="${CFLAGS}" \
-    LDFLAGS="${LDFLAGS}" \
-    CONFIGURE_OPTS="${CONFIGURE_OPTS} --enable-debug $(php -r "echo (bool)PHP_ZTS ? '--enable-zts' : '';") --enable-option-checking=fatal --disable-phpdbg --disable-cgi --disable-fpm --enable-cli --without-pcre-jit --disable-opcache-jit --disable-zend-max-execution-timers" \
-    cmd_build "${PREFIX}"
+  clear_php_build "${PREFIX}"
 
-    if test -n "${GITHUB_ACTIONS}" && test -d "${PHP_CACHE_DIR}"; then
-      cache_php_build "${PREFIX}" "${1}" "${CC}"
+  if test -n "${GITHUB_ACTIONS}" && test -d "${PHP_CACHE_DIR}"; then
+    if check_and_restore_cached_php "${PREFIX}" "${BUILD_KEY}"; then
+      return 0
     fi
+
+    clear_php_build "${PREFIX}"
+  fi
+
+  CC="${CC}" \
+  CXX="${CXX}" \
+  CFLAGS="-DZEND_TRACK_ARENA_ALLOC" \
+  CPPFLAGS="${CFLAGS}" \
+  LDFLAGS="${LDFLAGS}" \
+  CONFIGURE_OPTS="${CONFIGURE_OPTS} --enable-debug $(php -r "echo (bool)PHP_ZTS ? '--enable-zts' : '';") --enable-option-checking=fatal --disable-phpdbg --disable-cgi --disable-fpm --enable-cli --without-pcre-jit --disable-opcache-jit --disable-zend-max-execution-timers" \
+  cmd_build "${PREFIX}"
+
+  mark_php_build "${PREFIX}" "${BUILD_KEY}"
+
+  if test -n "${GITHUB_ACTIONS}" && test -d "${PHP_CACHE_DIR}"; then
+    cache_php_build "${PREFIX}" "${BUILD_KEY}"
   fi
 }
 
 check_and_restore_cached_php() {
   PREFIX="${1}"
-  BUILD_TYPE="${2}"
-  COMPILER="${3}"
-  CONFIGURE_OPTS_LOCAL="${4}"
-
-  CACHE_KEY="$(generate_cache_key "${BUILD_TYPE}" "${COMPILER}")"
-  CACHE_DIR="${PHP_CACHE_DIR}/${CACHE_KEY}"
+  BUILD_KEY="${2}"
+  CACHE_DIR="${PHP_CACHE_DIR}/${BUILD_KEY}"
 
   if test -f "${CACHE_DIR}/.build_complete"; then
     for BIN in php phpize php-config; do
@@ -190,9 +341,11 @@ check_and_restore_cached_php() {
       ln -sf "${CACHE_DIR}/usr/local/include/${PREFIX}-php" "/usr/local/include/${PREFIX}-php"
     fi
 
-    echo "[Pskel > Cache] Restored PHP header and binary: ${PREFIX}-php" >&2
+    if php_build_is_current "${PREFIX}" "${BUILD_KEY}"; then
+      echo "[Pskel > Cache] Restored PHP header and binary: ${PREFIX}-php" >&2
 
-    return 0
+      return 0
+    fi
   fi
 
   return 1
@@ -214,16 +367,18 @@ generate_cache_key() {
     fi
   fi
 
-  echo "php-${PHP_VERSION}-${PHP_ZTS}-${BUILD_TYPE}-${COMPILER}-${IMAGE_HASH}"
+  EXTRA_KEY=""
+  if test -n "${CACHE_KEY_SUFFIX}"; then
+    EXTRA_KEY="-${CACHE_KEY_SUFFIX}"
+  fi
+
+  echo "php-${PHP_VERSION}-${PHP_ZTS}-${BUILD_TYPE}-${COMPILER}-${IMAGE_HASH}${EXTRA_KEY}"
 }
 
 cache_php_build() {
   PREFIX="${1}"
-  BUILD_TYPE="${2}"
-  COMPILER="${3}"
-
-  CACHE_KEY="$(generate_cache_key "${BUILD_TYPE}" "${COMPILER}")"
-  CACHE_DIR="${PHP_CACHE_DIR}/${CACHE_KEY}"
+  BUILD_KEY="${2}"
+  CACHE_DIR="${PHP_CACHE_DIR}/${BUILD_KEY}"
 
   mkdir -p "${CACHE_DIR}/usr/local/bin"
 

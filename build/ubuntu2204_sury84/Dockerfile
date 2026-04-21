@@ -9,10 +9,18 @@ RUN apt-get update && \
         "software-properties-common" && \
     add-apt-repository ppa:ondrej/php -y && \
     apt-get update && \
-    apt-get install -y \
-        "php8.4" "php8.4-dev" "checkinstall"
+    apt-get install -y --no-install-recommends \
+        "build-essential" \
+        "debhelper" \
+        "dpkg-dev" \
+        "php8.4-cli" \
+        "php8.4-dev" && \
+    rm -rf /var/lib/apt/lists/*
 
-COPY ./ext /tmp/ext
+COPY ./ext /tmp/src/ext
+COPY ./LICENSE /tmp/src/LICENSE
+COPY ./README.md /tmp/src/README.md
+COPY ./build/ubuntu2204_sury84/debian /tmp/build/ubuntu2204_sury84/debian
 
 COPY ./build/ubuntu2204_sury84/build.sh /usr/bin/build
 

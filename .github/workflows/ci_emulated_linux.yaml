@@ -60,7 +60,7 @@ jobs:
       - name: Generate image tag
         id: image-tag
         run: |
-          TAG="ghcr.io/${{ github.repository }}/ci-emulated-cache:${{ steps.cut-arch.outputs.arch }}-${{ matrix.version }}-${{ matrix.type }}-${{ matrix.distro }}-${{ hashFiles('**/Dockerfile', '**/compose.yaml', '**/pskel.sh') }}"
+          TAG="ghcr.io/${{ github.repository }}/ci-emulated-cache:${{ steps.cut-arch.outputs.arch }}-${{ matrix.version }}-${{ matrix.type }}-${{ matrix.distro }}-${{ hashFiles('**/Dockerfile', '**/compose.yaml', '**/pskel.sh', '.pskel/**') }}"
           echo "tag=${TAG}" >> $GITHUB_OUTPUT
       - name: Check if image exists
         id: check-image

@@ -1,7 +1,11 @@
 <?php
 
 namespace {
-    if (\PHP_VERSION_ID >= 80000 && !\extension_loaded('colopl_bc')) {
+    if (\PHP_VERSION_ID >= 80000 && \PHP_VERSION_ID < 80100) {
+        \user_error('colopl_bc supports PHP 7.4 or PHP 8.1 and later; PHP 8.0 is not supported', \E_USER_ERROR);
+    }
+
+    if (\PHP_VERSION_ID >= 80100 && !\extension_loaded('colopl_bc')) {
         \user_error('colopl_bc extension is not loaded', \E_USER_ERROR);
     }
 }

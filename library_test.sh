@@ -4,7 +4,11 @@ export USE_ZEND_ALLOC=1
 export USE_TRACKED_ALLOC=0
 export ZEND_DONT_UNLOAD_MODULES=1
 cd "/project"
-  if php -r 'exit((\PHP_VERSION_ID >= 80000) ? 0 : 1);'; then
+  if php -r 'exit((\PHP_VERSION_ID >= 80000 && \PHP_VERSION_ID < 80100) ? 0 : 1);'; then
+    echo 'colopl_bc does not support PHP 8.0' >&2
+    exit 1
+  fi
+  if php -r 'exit((\PHP_VERSION_ID >= 80100) ? 0 : 1);'; then
     cd "ext"
       phpize
       ./configure

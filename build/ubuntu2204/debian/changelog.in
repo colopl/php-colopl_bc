@@ -1,0 +1,5 @@
+php-colopl-bc (@VERSION@) jammy; urgency=medium
+
+  * Build php8.1-colopl-bc for Ubuntu 22.04.
+
+ -- Go Kudo <g-kudo@colopl.co.jp>  Sun, 20 Apr 2026 00:00:00 +0000

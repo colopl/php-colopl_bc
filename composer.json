@@ -28,7 +28,7 @@
     "php-ext": {
         "extension-name": "colopl_bc",
         "build-path": "ext",
-        "download-url-method": ["pre-packaged-binary", "composer-default"],
+        "download-url-method": ["pre-packaged-binary", "pre-packaged-source", "composer-default"],
         "configure-options": [
             {
                 "name": "enable-colopl_bc",
@@ -36,7 +36,7 @@
             }
         ]
     },
-    "license": "PHP-3.01",
+    "license": "BSD-3-Clause",
     "authors": [
         {
             "name": "Go Kudo",

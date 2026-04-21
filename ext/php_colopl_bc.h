@@ -3,15 +3,9 @@
   | COLOPL PHP Backwards Compatibility Extension.                        |
   +----------------------------------------------------------------------+
   | Copyright (c) COLOPL, Inc.                                           |
-  | Copyright (c) The PHP Group                                          |
   +----------------------------------------------------------------------+
-  | This source file is subject to version 3.01 of the PHP license,      |
-  | that is bundled with this package in the file LICENSE, and is        |
-  | available through the world-wide-web at the following url:           |
-  | http://www.php.net/license/3_01.txt                                  |
-  | If you did not receive a copy of the PHP license and are unable to   |
-  | obtain it through the world-wide-web, please send a note to          |
-  | license@php.net so we can mail you a copy immediately.               |
+  | This source file is subject to the BSD-3-Clause license that is      |
+  | bundled with this package in the file LICENSE.                       |
   +----------------------------------------------------------------------+
   | Author: Go Kudo <g-kudo@colopl.co.jp>                                |
   +----------------------------------------------------------------------+
@@ -42,13 +36,18 @@ extern zend_module_entry colopl_bc_module_entry;
 #define COLOPL_BC_PHP74_SORT_MODE_DEPRECATED	1
 #define COLOPL_BC_PHP74_SORT_MODE_LOG			2
 
-#define PHP_COLOPL_BC_VERSION "12.0.1"
+#define PHP_COLOPL_BC_VERSION "12.1.0"
+
+enum {
+	COLOPL_BC_MT_N = 624,
+	COLOPL_BC_MT_STATE_SIZE = COLOPL_BC_MT_N + 1
+};
 
 ZEND_BEGIN_MODULE_GLOBALS(colopl_bc)
 	bool rand_is_seeded;
 	bool mt_rand_is_seeded;
 	uint32_t rand_seed;
-	uint32_t mt_state[N+1];
+	uint32_t mt_state[COLOPL_BC_MT_STATE_SIZE];
 	uint32_t *mt_next;
 	int mt_left;
 	int gnurandom_r[344];

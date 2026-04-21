@@ -36,7 +36,7 @@ extern zend_module_entry colopl_bc_module_entry;
 #define COLOPL_BC_PHP74_SORT_MODE_DEPRECATED	1
 #define COLOPL_BC_PHP74_SORT_MODE_LOG			2
 
-#define PHP_COLOPL_BC_VERSION "12.0.1"
+#define PHP_COLOPL_BC_VERSION "12.1.0"
 
 enum {
 	COLOPL_BC_MT_N = 624,

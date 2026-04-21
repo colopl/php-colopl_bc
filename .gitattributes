@@ -1,15 +1,21 @@
 # Exclude non-essential files from git archive (used by PIE/Composer downloads)
-/.github/          export-ignore
-/build/            export-ignore
-/patches/          export-ignore
-/tests/            export-ignore
-/third_party/      export-ignore
-/ext/tests/        export-ignore
+# Exclude devcontainer and editor metadata from git archive
+/.devcontainer/      export-ignore
+/.dockerignore       export-ignore
+/.editorconfig       export-ignore
+/.github/            export-ignore
+/.gitmodules         export-ignore
+/.vscode/            export-ignore
+/build/              export-ignore
+/patches/            export-ignore
+/tests/              export-ignore
+/third_party/        export-ignore
+/ext/tests/          export-ignore
 /ext/description-pak export-ignore
-Dockerfile         export-ignore
-compose.yaml       export-ignore
-library_test.sh    export-ignore
-phpstan.neon       export-ignore
-phpunit.xml        export-ignore
-pskel.sh           export-ignore
-CHANGELOG.md       export-ignore
+Dockerfile           export-ignore
+compose.yaml         export-ignore
+library_test.sh      export-ignore
+phpstan.neon         export-ignore
+phpunit.xml          export-ignore
+pskel.sh             export-ignore
+CHANGELOG.md         export-ignore

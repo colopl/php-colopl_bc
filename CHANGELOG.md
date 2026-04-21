@@ -1,4 +1,4 @@
-# 12.0.0
+# 12.1.0
 - Change the project license from PHP-3.01 to BSD-3-Clause
 - Tighten package support to PHP 7.4 or PHP 8.1+
 - Refactor internals toward PHP 8.1+ APIs

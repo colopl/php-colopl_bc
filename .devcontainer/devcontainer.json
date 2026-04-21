@@ -1,5 +1,5 @@
 {
-  "name": "colopl_bc: Pskel (for Codespaces)",
+  "name": "colopl_bc: Pskel",
   "customizations": {
     "vscode": {
       "extensions": [
@@ -7,10 +7,17 @@
         "ms-vscode.cpptools-extension-pack",
         "maelvalais.autoconf",
         "ms-azuretools.vscode-docker",
-        "editorconfig.editorconfig"
+        "editorconfig.editorconfig",
+        "markis.code-coverage"
       ]
     }
   },
   "dockerComposeFile": "./../compose.yaml",
-  "service": "shell"
+  "service": "shell",
+  "mounts": [
+    "source=${localWorkspaceFolder},target=/workspace,type=bind,consistency=cached"
+  ],
+  "workspaceFolder": "/workspace",
+  "initializeCommand": "git submodule update --init --recursive",
+  "postCreateCommand": "ln -sf \"$(pwd)/pskel.sh\" /usr/local/bin/pskel"
 }

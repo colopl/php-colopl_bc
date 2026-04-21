@@ -93,6 +93,16 @@ jobs:
           touch "lcov.info"
           docker compose run -v "$(pwd)/lcov.info:/ext/lcov.info" --rm shell pskel coverage
           mv "lcov.info" "${{ matrix.platform }}_${{ matrix.versions }}_${{ matrix.ts }}_lcov.info"
+      - name: Verify shard function coverage records
+        run: |
+          COVERAGE_FILE="${{ matrix.platform }}_${{ matrix.versions }}_${{ matrix.ts }}_lcov.info"
+          for RECORD in "FN:" "FNDA:" "FNF:" "FNH:"; do
+            if ! grep -q "^${RECORD}" "${COVERAGE_FILE}"; then
+              echo "Missing ${RECORD} records in ${COVERAGE_FILE}"
+              exit 1
+            fi
+          done
+          lcov --summary "${COVERAGE_FILE}"
       - name: Upload coverage artifact
         uses: actions/upload-artifact@v7
         with:
@@ -137,6 +147,24 @@ jobs:
         with:
           name: initialized-ext-coverage
           path: ext/
+      - name: Verify downloaded function coverage records
+        run: |
+          cd "coverage-files" || exit 1
+          set -- ./*.info
+          if test "${1}" = "./*.info"; then
+            echo "No coverage .info files found"
+            exit 1
+          fi
+          for INFO_FILE in "$@"; do
+            for RECORD in "FN:" "FNDA:" "FNF:" "FNH:"; do
+              if ! grep -q "^${RECORD}" "${INFO_FILE}"; then
+                echo "Missing ${RECORD} records in ${INFO_FILE} before merge"
+                exit 1
+              fi
+            done
+            lcov --summary "${INFO_FILE}"
+          done
+          cd - || exit 1
       - name: Generate integrated HTML coverage reports
         run: |
           if ! test -d "/ext"; then
@@ -165,6 +193,15 @@ jobs:
           genhtml "total.info" \
             --output-directory "coverage-html" \
             --title "Extension code coverage"
+      - name: Verify merged function coverage records
+        run: |
+          for RECORD in "FN:" "FNDA:" "FNF:" "FNH:"; do
+            if ! grep -q "^${RECORD}" "total.info"; then
+              echo "Missing ${RECORD} records in total.info after merge"
+              exit 1
+            fi
+          done
+          lcov --summary "total.info"
       - name: Setup Pages
         uses: actions/configure-pages@v6
       - name: Upload Pages artifact

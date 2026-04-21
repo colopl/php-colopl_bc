@@ -47,7 +47,7 @@ Build packages for the official Ubuntu 22.04 PHP 8.1 stack:
 ```bash
 $ docker build -f "build/ubuntu2204/Dockerfile" -t "colopl-bc-u2204-php81" .
 $ mkdir -p "artifacts"
-$ docker run --rm -e VERSION="12.0.0" -v "$(pwd)/artifacts:/tmp/artifacts" "colopl-bc-u2204-php81"
+$ docker run --rm -e VERSION="x.y.z" -v "$(pwd)/artifacts:/tmp/artifacts" "colopl-bc-u2204-php81"
 ```
 
 This target produces `php-colopl-bc` and `php8.1-colopl-bc` binary packages together with the corresponding `.changes` and `.buildinfo` files.
@@ -57,7 +57,7 @@ Build packages for Ubuntu 22.04 with the Ondrej Sury PHP 8.4 repository:
 ```bash
 $ docker build -f "build/ubuntu2204_sury84/Dockerfile" -t "colopl-bc-u2204-php84" .
 $ mkdir -p "artifacts"
-$ docker run --rm -e VERSION="12.0.0" -v "$(pwd)/artifacts:/tmp/artifacts" "colopl-bc-u2204-php84"
+$ docker run --rm -e VERSION="x.y.z" -v "$(pwd)/artifacts:/tmp/artifacts" "colopl-bc-u2204-php84"
 ```
 
 This target produces the `php8.4-colopl-bc` binary package together with the corresponding `.changes` and `.buildinfo` files.

@@ -3,7 +3,7 @@ services:
     image: ${SHELL_IMAGE:-shell}
     # environment:
       # - CONFIGURE_OPTS=--enable-pdo --enable-mysqlnd --with-pdo-mysql
-      # - LCOV_OPTS=--ignore-errors unused --exclude=/ext/third_party/* --ignore-errors unused --exclude=/workspaces/pskel/ext/third_party/*
+      # - LCOV_OPTS=--ignore-errors unused --exclude=/ext/third_party/*
     build:
       context: ./
       dockerfile: ./Dockerfile

@@ -1,3 +1,5 @@
 [submodule "third_party/valgrind"]
 	path = third_party/valgrind
 	url = https://sourceware.org/git/valgrind.git
+	branch = VALGRIND_3_27_0
+

@@ -28,7 +28,7 @@
     "php-ext": {
         "extension-name": "colopl_bc",
         "build-path": "ext",
-        "download-url-method": ["pre-packaged-binary", "composer-default"],
+        "download-url-method": ["pre-packaged-binary", "pre-packaged-source", "composer-default"],
         "configure-options": [
             {
                 "name": "enable-colopl_bc",

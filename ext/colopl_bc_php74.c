@@ -1634,16 +1634,9 @@ static inline void php_colopl_bc_report_incompatible_sort(void)
 
 static inline void php_colopl_bc_hash_sort(HashTable *ht, bucket_compare_func_t compare_func, bool renumber, bool compare_func_may_call_user_code)
 {
-#if PHP_VERSION_ID >= 80200
-	if (compare_func_may_call_user_code) {
-		zend_array_sort(ht, compare_func, renumber);
-		return;
-	}
-#else
 	(void) compare_func_may_call_user_code;
-#endif
 
-	zend_hash_sort(ht, compare_func, renumber);
+	zend_hash_sort_ex(ht, zend_sort, compare_func, renumber);
 }
 
 static void legacy_hash_sort_fast(INTERNAL_FUNCTION_PARAMETERS, zval *array, bucket_compare_func_t compare_func, bool renumber, bool compare_func_may_call_user_code)

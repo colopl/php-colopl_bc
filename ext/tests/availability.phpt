@@ -1,5 +1,7 @@
 --TEST--
 Check for COLOPL PHP Backward Compatibility Extension availability.
+--EXTENSIONS--
+colopl_bc
 --INI--
 date.timezone=UTC
 --FILE--

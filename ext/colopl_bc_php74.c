@@ -125,6 +125,106 @@ static inline bool php_colopl_bc_zvals_contain_object(zval *op1, zval *op2)
 	return contains_object;
 }
 
+static inline bool php_colopl_bc_zval_contains_child_array(zval *op)
+{
+	zval *entry;
+
+	ZVAL_DEREF(op);
+	if (Z_TYPE_P(op) == IS_INDIRECT) {
+		op = Z_INDIRECT_P(op);
+		ZVAL_DEREF(op);
+	}
+
+	if (Z_TYPE_P(op) != IS_ARRAY) {
+		return false;
+	}
+
+	ZEND_HASH_FOREACH_VAL(Z_ARRVAL_P(op), entry) {
+		ZVAL_DEREF(entry);
+		if (Z_TYPE_P(entry) == IS_INDIRECT) {
+			entry = Z_INDIRECT_P(entry);
+			ZVAL_DEREF(entry);
+		}
+		if (Z_TYPE_P(entry) == IS_ARRAY) {
+			return true;
+		}
+	} ZEND_HASH_FOREACH_END();
+
+	return false;
+}
+
+static inline bool php_colopl_bc_zval_contains_recursive_array_ex(zval *op, HashTable *seen_arrays, HashTable *active_arrays)
+{
+	zend_array *array;
+	zend_ulong key;
+	zval *entry;
+	bool contains_recursive_array = false;
+
+	ZVAL_DEREF(op);
+	if (Z_TYPE_P(op) == IS_INDIRECT) {
+		op = Z_INDIRECT_P(op);
+		ZVAL_DEREF(op);
+	}
+
+	if (Z_TYPE_P(op) != IS_ARRAY) {
+		return false;
+	}
+
+	array = Z_ARRVAL_P(op);
+	key = (zend_ulong)(uintptr_t) array;
+	if (zend_hash_index_exists(active_arrays, key)) {
+		return true;
+	}
+	if (zend_hash_index_exists(seen_arrays, key)) {
+		return false;
+	}
+
+	zend_hash_index_add_empty_element(active_arrays, key);
+	ZEND_HASH_FOREACH_VAL(array, entry) {
+		if (php_colopl_bc_zval_contains_recursive_array_ex(entry, seen_arrays, active_arrays)) {
+			contains_recursive_array = true;
+			break;
+		}
+	} ZEND_HASH_FOREACH_END();
+	zend_hash_index_del(active_arrays, key);
+	if (contains_recursive_array) {
+		return true;
+	}
+	zend_hash_index_add_empty_element(seen_arrays, key);
+
+	return false;
+}
+
+static inline bool php_colopl_bc_zval_contains_recursive_array(zval *op)
+{
+	HashTable seen_arrays, active_arrays;
+	bool contains_recursive_array;
+
+	zend_hash_init(&seen_arrays, 8, NULL, NULL, 0);
+	zend_hash_init(&active_arrays, 8, NULL, NULL, 0);
+	contains_recursive_array = php_colopl_bc_zval_contains_recursive_array_ex(op, &seen_arrays, &active_arrays);
+	zend_hash_destroy(&active_arrays);
+	zend_hash_destroy(&seen_arrays);
+
+	return contains_recursive_array;
+}
+
+static inline bool php_colopl_bc_zvals_contain_recursive_array(zval *op1, zval *op2)
+{
+	HashTable seen_arrays, active_arrays;
+	bool contains_recursive_array;
+
+	zend_hash_init(&seen_arrays, 8, NULL, NULL, 0);
+	zend_hash_init(&active_arrays, 8, NULL, NULL, 0);
+	contains_recursive_array =
+		php_colopl_bc_zval_contains_recursive_array_ex(op1, &seen_arrays, &active_arrays) ||
+		php_colopl_bc_zval_contains_recursive_array_ex(op2, &seen_arrays, &active_arrays);
+	zend_hash_destroy(&active_arrays);
+	zend_hash_destroy(&seen_arrays);
+
+	return contains_recursive_array;
+}
+
 static inline bool php_colopl_bc_snapshot_zval(zval *dst, zval *src, php_colopl_bc_snapshot_context *ctx)
 {
 	zend_object *src_object, *object, *cached_obj;
@@ -198,6 +298,7 @@ static inline bool php_colopl_bc_snapshot_zval(zval *dst, zval *src, php_colopl_
 				dst_prop = object->properties_table + i;
 
 				ZVAL_UNDEF(dst_prop);
+				Z_PROP_FLAG_P(dst_prop) = Z_PROP_FLAG_P(src_prop);
 
 				if (Z_TYPE_P(src_prop) == IS_UNDEF) {
 					continue;
@@ -555,6 +656,7 @@ static int legacy_compare_slow(zval *op1, zval *op2)
 	ZVAL_UNDEF(&native_op2);
 	php_colopl_bc_snapshot_context_init(&snapshot_context);
 	have_native_snapshot = !php_colopl_bc_zvals_contain_object(op1, op2) &&
+		!php_colopl_bc_zvals_contain_recursive_array(op1, op2) &&
 		php_colopl_bc_snapshot_zval(&native_op1, op1, &snapshot_context) &&
 		php_colopl_bc_snapshot_zval(&native_op2, op2, &snapshot_context)
 	;
@@ -1313,11 +1415,11 @@ static inline void php_colopl_bc_search_array(INTERNAL_FUNCTION_PARAMETERS, int 
 	COLOPL_BC_G(user_compare_fci) = old_user_compare_fci; \
 	COLOPL_BC_G(user_compare_fci_cache) = old_user_compare_fci_cache; \
 
-static void legacy_hash_sort_fast(INTERNAL_FUNCTION_PARAMETERS, zval *array, bucket_compare_func_t comapre_func, bool renumber, bool compare_func_may_call_user_code)
+static void legacy_hash_sort_fast(INTERNAL_FUNCTION_PARAMETERS, zval *array, bucket_compare_func_t compare_func, bool renumber, bool compare_func_may_call_user_code)
 {
 	(void) compare_func_may_call_user_code;
 
-	zend_hash_sort(Z_ARRVAL_P(array), comapre_func, renumber);
+	zend_hash_sort(Z_ARRVAL_P(array), compare_func, renumber);
 }
 
 static void legacy_hash_sort_slow(INTERNAL_FUNCTION_PARAMETERS, zval *array, bucket_compare_func_t compare_func, bool renumber, bool compare_func_may_call_user_code)
@@ -1338,6 +1440,14 @@ static void legacy_hash_sort_slow(INTERNAL_FUNCTION_PARAMETERS, zval *array, buc
 		zend_hash_init(&seen_arrays, 8, NULL, NULL, 0);
 		may_call_user_code = php_colopl_bc_zval_contains_object(array, &seen_arrays);
 		zend_hash_destroy(&seen_arrays);
+	}
+
+	if (!may_call_user_code) {
+		may_call_user_code = php_colopl_bc_zval_contains_child_array(array);
+	}
+
+	if (!may_call_user_code) {
+		may_call_user_code = php_colopl_bc_zval_contains_recursive_array(array);
 	}
 
 	have_native_snapshot = !may_call_user_code && php_colopl_bc_snapshot_zval(&native, array, &snapshot_context);

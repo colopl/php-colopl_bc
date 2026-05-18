@@ -838,6 +838,10 @@ static int legacy_compare_slow(zval *op1, zval *op2)
 	bool have_native_snapshot, native_failed;
 	int bc, native;
 
+	if (COLOPL_BC_G(php74_compare_mode) <= COLOPL_BC_PHP74_COMPARE_MODE_SILENT) {
+		return legacy_compare_fast(op1, op2);
+	}
+
 	ZVAL_UNDEF(&native_op1);
 	ZVAL_UNDEF(&native_op2);
 	php_colopl_bc_snapshot_context_init(&snapshot_context);
@@ -1628,13 +1632,23 @@ static inline void php_colopl_bc_report_incompatible_sort(void)
 	}
 }
 
+static inline void php_colopl_bc_hash_sort(HashTable *ht, bucket_compare_func_t compare_func, bool renumber, bool compare_func_may_call_user_code)
+{
+#if PHP_VERSION_ID >= 80200
+	if (compare_func_may_call_user_code) {
+		zend_array_sort(ht, compare_func, renumber);
+		return;
+	}
+#else
+	(void) compare_func_may_call_user_code;
+#endif
+
+	zend_hash_sort(ht, compare_func, renumber);
+}
+
 static void legacy_hash_sort_fast(INTERNAL_FUNCTION_PARAMETERS, zval *array, bucket_compare_func_t compare_func, bool renumber, bool compare_func_may_call_user_code)
 {
-	if (compare_func_may_call_user_code) {
-		zend_array_sort(Z_ARRVAL_P(array), compare_func, renumber);
-	} else {
-		zend_hash_sort(Z_ARRVAL_P(array), compare_func, renumber);
-	}
+	php_colopl_bc_hash_sort(Z_ARRVAL_P(array), compare_func, renumber, compare_func_may_call_user_code);
 }
 
 static void legacy_hash_sort_slow(INTERNAL_FUNCTION_PARAMETERS, zval *array, bucket_compare_func_t compare_func, bool renumber, bool compare_func_may_call_user_code)
@@ -1649,6 +1663,11 @@ static void legacy_hash_sort_slow(INTERNAL_FUNCTION_PARAMETERS, zval *array, buc
 		may_call_user_code = compare_func_may_call_user_code, track_user_sort = compare_func_may_call_user_code,
 		user_sort_incompatible = false;
 	char *fnname_ptr;
+
+	if (COLOPL_BC_G(php74_sort_mode) <= COLOPL_BC_PHP74_SORT_MODE_SILENT) {
+		legacy_hash_sort_fast(INTERNAL_FUNCTION_PARAM_PASSTHRU, array, compare_func, renumber, compare_func_may_call_user_code);
+		return;
+	}
 
 	ZVAL_UNDEF(&native);
 	ZVAL_UNDEF(&user_sort_original);
@@ -1762,12 +1781,20 @@ static void php_colopl_bc_usort(INTERNAL_FUNCTION_PARAMETERS, bucket_compare_fun
 		Z_PARAM_FUNC(COLOPL_BC_G(user_compare_fci), COLOPL_BC_G(user_compare_fci_cache))
 	ZEND_PARSE_PARAMETERS_END_EX( PHP_COLOPL_BC_ARRAY_CMP_FUNC_RESTORE(); return );
 
-	/* Copy array, so the in-place modifications will not be visible to the callback function */
-	ZVAL_DUP(&arr, array);
-	if (zend_hash_num_elements(Z_ARRVAL(arr)) == 0) {
+	if (zend_hash_num_elements(Z_ARRVAL_P(array)) == 0) {
 		PHP_COLOPL_BC_ARRAY_CMP_FUNC_RESTORE();
 		RETURN_TRUE;
 	}
+
+	if (COLOPL_BC_G(php74_sort_mode) <= COLOPL_BC_PHP74_SORT_MODE_SILENT) {
+		SEPARATE_ARRAY(array);
+		legacy_hash_sort_fast(INTERNAL_FUNCTION_PARAM_PASSTHRU, array, compare_func, renumber, true);
+		PHP_COLOPL_BC_ARRAY_CMP_FUNC_RESTORE();
+		RETURN_TRUE;
+	}
+
+	/* Copy array, so the diagnostic path can compare the legacy result. */
+	ZVAL_DUP(&arr, array);
 
 	COLOPL_BC_G(php74_hash_sort_func)(INTERNAL_FUNCTION_PARAM_PASSTHRU, &arr, compare_func, renumber, true);
 

@@ -15,7 +15,10 @@ $array = range(1, 64);
 });
 var_dump($array);
 ?>
---EXPECT--
+--EXPECTF--
+Incompatible sort detected
+
+Deprecated: Colopl\ColoplBc\Php74\uksort(): Incompatible sort detected in %s on line %d
 array(64) {
   [0]=>
   int(1)

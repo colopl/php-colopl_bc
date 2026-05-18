@@ -37,6 +37,17 @@ typedef struct _php_colopl_bc_diagnostic_error_state {
 	bool record_errors;
 } php_colopl_bc_diagnostic_error_state;
 
+typedef struct _php_colopl_bc_user_sort_zero_pair {
+	uint32_t first;
+	uint32_t second;
+} php_colopl_bc_user_sort_zero_pair;
+
+typedef struct _php_colopl_bc_user_sort_context {
+	php_colopl_bc_user_sort_zero_pair *zero_pairs;
+	uint32_t zero_pair_count;
+	uint32_t zero_pair_capacity;
+} php_colopl_bc_user_sort_context;
+
 static inline void php_colopl_bc_snapshot_context_init(php_colopl_bc_snapshot_context *ctx)
 {
 	zend_hash_init(&ctx->arrays, 8, NULL, NULL, 0);
@@ -392,6 +403,181 @@ static inline zval *php_colopl_bc_hash_get_ordered_value(HashTable *ht, uint32_t
 	}
 
 	return NULL;
+}
+
+static inline void php_colopl_bc_user_sort_context_init(php_colopl_bc_user_sort_context *ctx)
+{
+	ctx->zero_pairs = NULL;
+	ctx->zero_pair_count = 0;
+	ctx->zero_pair_capacity = 0;
+}
+
+static inline void php_colopl_bc_user_sort_context_destroy(php_colopl_bc_user_sort_context *ctx)
+{
+	if (ctx->zero_pairs != NULL) {
+		efree(ctx->zero_pairs);
+	}
+}
+
+static inline void php_colopl_bc_user_sort_context_record_zero_pair(Bucket *first, Bucket *second)
+{
+	php_colopl_bc_user_sort_context *ctx = COLOPL_BC_G(php74_user_sort_context);
+	uint32_t first_pos, second_pos, new_capacity;
+
+	if (ctx == NULL) {
+		return;
+	}
+
+	first_pos = Z_EXTRA(first->val);
+	second_pos = Z_EXTRA(second->val);
+	if (first_pos == second_pos) {
+		return;
+	}
+
+	if (ctx->zero_pair_count == ctx->zero_pair_capacity) {
+		new_capacity = ctx->zero_pair_capacity == 0 ? 16 : ctx->zero_pair_capacity * 2;
+		ctx->zero_pairs = erealloc(ctx->zero_pairs, sizeof(php_colopl_bc_user_sort_zero_pair) * new_capacity);
+		ctx->zero_pair_capacity = new_capacity;
+	}
+
+	ctx->zero_pairs[ctx->zero_pair_count].first = first_pos;
+	ctx->zero_pairs[ctx->zero_pair_count].second = second_pos;
+	ctx->zero_pair_count++;
+}
+
+static inline bool php_colopl_bc_hash_get_ordered_entry_at(HashTable *ht, uint32_t target_pos, zval **value, zend_ulong *num_key, zend_string **str_key)
+{
+	uint32_t pos = 0, ordered_pos = 0;
+
+	while ((*value = php_colopl_bc_hash_get_ordered_value(ht, &pos, num_key, str_key)) != NULL) {
+		if (ordered_pos == target_pos) {
+			return true;
+		}
+		ordered_pos++;
+	}
+
+	return false;
+}
+
+static inline bool php_colopl_bc_user_sort_pair_values_identical(zval *original, uint32_t first_pos, uint32_t second_pos)
+{
+	zend_ulong first_num_key, second_num_key;
+	zend_string *first_str_key, *second_str_key;
+	zval *first, *second;
+
+	if (Z_ISUNDEF_P(original)) {
+		return false;
+	}
+
+	if (!php_colopl_bc_hash_get_ordered_entry_at(Z_ARRVAL_P(original), first_pos, &first, &first_num_key, &first_str_key) ||
+		!php_colopl_bc_hash_get_ordered_entry_at(Z_ARRVAL_P(original), second_pos, &second, &second_num_key, &second_str_key)) {
+		return false;
+	}
+
+	return zend_is_identical(first, second);
+}
+
+static inline bool php_colopl_bc_user_sort_find_final_position_by_key(zval *legacy, zend_ulong original_num_key, zend_string *original_str_key, uint32_t *final_pos)
+{
+	zend_ulong num_key;
+	zend_string *str_key;
+	zval *value;
+	uint32_t pos = 0;
+
+	*final_pos = 0;
+	while ((value = php_colopl_bc_hash_get_ordered_value(Z_ARRVAL_P(legacy), &pos, &num_key, &str_key)) != NULL) {
+		(void) value;
+
+		if (original_str_key != NULL) {
+			if (str_key != NULL && zend_string_equals(str_key, original_str_key)) {
+				return true;
+			}
+		} else if (str_key == NULL && num_key == original_num_key) {
+			return true;
+		}
+
+		(*final_pos)++;
+	}
+
+	return false;
+}
+
+static inline bool php_colopl_bc_user_sort_find_final_position_by_value(zval *legacy, zval *original_value, uint32_t *final_pos)
+{
+	zend_ulong num_key;
+	zend_string *str_key;
+	zval *value;
+	uint32_t pos = 0;
+
+	*final_pos = 0;
+	while ((value = php_colopl_bc_hash_get_ordered_value(Z_ARRVAL_P(legacy), &pos, &num_key, &str_key)) != NULL) {
+		(void) num_key;
+		(void) str_key;
+
+		if (zend_is_identical(value, original_value)) {
+			return true;
+		}
+
+		(*final_pos)++;
+	}
+
+	return false;
+}
+
+static inline bool php_colopl_bc_user_sort_find_final_position(zval *legacy, zval *original, uint32_t original_pos, bool renumber, uint32_t *final_pos)
+{
+	zend_ulong num_key;
+	zend_string *str_key;
+	zval *value;
+
+	if (Z_ISUNDEF_P(original) ||
+		!php_colopl_bc_hash_get_ordered_entry_at(Z_ARRVAL_P(original), original_pos, &value, &num_key, &str_key)) {
+		return false;
+	}
+
+	if (renumber) {
+		return php_colopl_bc_user_sort_find_final_position_by_value(legacy, value, final_pos);
+	}
+
+	return php_colopl_bc_user_sort_find_final_position_by_key(legacy, num_key, str_key, final_pos);
+}
+
+static inline bool php_colopl_bc_user_sort_context_detect_incompatible_order(php_colopl_bc_user_sort_context *ctx, zval *legacy, zval *original, bool renumber)
+{
+	uint32_t num_elements, i, first_pos, second_pos, first_final_pos, second_final_pos;
+
+	if (ctx->zero_pair_count == 0) {
+		return false;
+	}
+
+	num_elements = zend_hash_num_elements(Z_ARRVAL_P(legacy));
+	if (num_elements == 0) {
+		return false;
+	}
+
+	for (i = 0; i < ctx->zero_pair_count; i++) {
+		first_pos = ctx->zero_pairs[i].first;
+		second_pos = ctx->zero_pairs[i].second;
+		if (first_pos >= num_elements || second_pos >= num_elements) {
+			continue;
+		}
+
+		if (renumber && php_colopl_bc_user_sort_pair_values_identical(original, first_pos, second_pos)) {
+			continue;
+		}
+
+		if (!php_colopl_bc_user_sort_find_final_position(legacy, original, first_pos, renumber, &first_final_pos) ||
+			!php_colopl_bc_user_sort_find_final_position(legacy, original, second_pos, renumber, &second_final_pos)) {
+			continue;
+		}
+
+		if ((first_pos < second_pos && first_final_pos > second_final_pos) ||
+			(first_pos > second_pos && first_final_pos < second_final_pos)) {
+			return true;
+		}
+	}
+
+	return false;
 }
 
 static inline bool php_colopl_bc_same_snapshot_array_pair_seen(HashTable *seen_arrays, zend_array *legacy_array, zend_array *native_array)
@@ -1084,8 +1270,9 @@ static int php_colopl_bc_array_reverse_data_compare_string_locale(Bucket *a, Buc
 
 static int php_colopl_bc_array_user_compare(Bucket *f, Bucket *s)
 {
-	zval args[2];
-	zval retval;
+	zend_long ret;
+	zval args[2], retval;
+	int result;
 
 	ZVAL_COPY(&args[0], &f->val);
 	ZVAL_COPY(&args[1], &s->val);
@@ -1094,16 +1281,26 @@ static int php_colopl_bc_array_user_compare(Bucket *f, Bucket *s)
 	COLOPL_BC_G(user_compare_fci).params = args;
 	COLOPL_BC_G(user_compare_fci).retval = &retval;
 	if (zend_call_function(&COLOPL_BC_G(user_compare_fci), &COLOPL_BC_G(user_compare_fci_cache)) == SUCCESS && Z_TYPE(retval) != IS_UNDEF) {
-		zend_long ret = zval_get_long(&retval);
+		ret = zval_get_long(&retval);
+		result = ZEND_NORMALIZE_BOOL(ret);
+
 		zval_ptr_dtor(&retval);
 		zval_ptr_dtor(&args[1]);
 		zval_ptr_dtor(&args[0]);
-		return ZEND_NORMALIZE_BOOL(ret);
+		if (result == 0) {
+			php_colopl_bc_user_sort_context_record_zero_pair(f, s);
+		}
+
+		return result;
 	} else {
 		zval_ptr_dtor(&args[1]);
 		zval_ptr_dtor(&args[0]);
-		return 0;
+		php_colopl_bc_user_sort_context_record_zero_pair(f, s);
+
+		result = 0;
 	}
+
+	return result;
 }
 
 static int php_colopl_bc_array_user_key_compare(Bucket *f, Bucket *s)
@@ -1136,7 +1333,12 @@ static int php_colopl_bc_array_user_key_compare(Bucket *f, Bucket *s)
 	zval_ptr_dtor(&args[0]);
 	zval_ptr_dtor(&args[1]);
 
-	return ZEND_NORMALIZE_BOOL(result);
+	result = ZEND_NORMALIZE_BOOL(result);
+	if (result == 0) {
+		php_colopl_bc_user_sort_context_record_zero_pair(f, s);
+	}
+
+	return result;
 }
 
 static bucket_compare_func_t php_colopl_bc_get_key_compare_func(zend_long sort_type, int reverse)
@@ -1415,24 +1617,41 @@ static inline void php_colopl_bc_search_array(INTERNAL_FUNCTION_PARAMETERS, int 
 	COLOPL_BC_G(user_compare_fci) = old_user_compare_fci; \
 	COLOPL_BC_G(user_compare_fci_cache) = old_user_compare_fci_cache; \
 
+static inline void php_colopl_bc_report_incompatible_sort(void)
+{
+	if (COLOPL_BC_G(php74_sort_mode) & COLOPL_BC_PHP74_SORT_MODE_LOG) {
+		php_log_err_with_severity("Incompatible sort detected", LOG_NOTICE);
+	}
+
+	if (COLOPL_BC_G(php74_sort_mode) & COLOPL_BC_PHP74_SORT_MODE_DEPRECATED) {
+		php_error_docref(NULL, E_DEPRECATED, "Incompatible sort detected");
+	}
+}
+
 static void legacy_hash_sort_fast(INTERNAL_FUNCTION_PARAMETERS, zval *array, bucket_compare_func_t compare_func, bool renumber, bool compare_func_may_call_user_code)
 {
-	(void) compare_func_may_call_user_code;
-
-	zend_hash_sort(Z_ARRVAL_P(array), compare_func, renumber);
+	if (compare_func_may_call_user_code) {
+		zend_array_sort(Z_ARRVAL_P(array), compare_func, renumber);
+	} else {
+		zend_hash_sort(Z_ARRVAL_P(array), compare_func, renumber);
+	}
 }
 
 static void legacy_hash_sort_slow(INTERNAL_FUNCTION_PARAMETERS, zval *array, bucket_compare_func_t compare_func, bool renumber, bool compare_func_may_call_user_code)
 {
 	php_colopl_bc_snapshot_context snapshot_context;
 	php_colopl_bc_diagnostic_error_state error_state;
+	php_colopl_bc_user_sort_context user_sort_context, *old_user_sort_context;
 	zend_internal_function *fn;
+	zval legacy, native, original, user_sort_original;
 	HashTable seen_arrays;
-	zval legacy, native, original;
-	bool have_native_snapshot, native_failed = false, may_call_user_code = compare_func_may_call_user_code;
+	bool have_native_snapshot, native_failed = false,
+		may_call_user_code = compare_func_may_call_user_code, track_user_sort = compare_func_may_call_user_code,
+		user_sort_incompatible = false;
 	char *fnname_ptr;
 
 	ZVAL_UNDEF(&native);
+	ZVAL_UNDEF(&user_sort_original);
 	ZVAL_DUP(&legacy, array);
 	php_colopl_bc_snapshot_context_init(&snapshot_context);
 
@@ -1452,7 +1671,26 @@ static void legacy_hash_sort_slow(INTERNAL_FUNCTION_PARAMETERS, zval *array, buc
 
 	have_native_snapshot = !may_call_user_code && php_colopl_bc_snapshot_zval(&native, array, &snapshot_context);
 
+	if (track_user_sort) {
+		ZVAL_DUP(&user_sort_original, array);
+		SEPARATE_ARRAY(&user_sort_original);
+		php_colopl_bc_user_sort_context_init(&user_sort_context);
+		old_user_sort_context = COLOPL_BC_G(php74_user_sort_context);
+		COLOPL_BC_G(php74_user_sort_context) = &user_sort_context;
+	}
+
 	legacy_hash_sort_fast(INTERNAL_FUNCTION_PARAM_PASSTHRU, &legacy, compare_func, renumber, compare_func_may_call_user_code);
+
+	if (track_user_sort) {
+		COLOPL_BC_G(php74_user_sort_context) = old_user_sort_context;
+		if (!EG(exception)) {
+			user_sort_incompatible = php_colopl_bc_user_sort_context_detect_incompatible_order(&user_sort_context, &legacy, &user_sort_original, renumber);
+		}
+		php_colopl_bc_user_sort_context_destroy(&user_sort_context);
+		if (!Z_ISUNDEF(user_sort_original)) {
+			zval_ptr_dtor(&user_sort_original);
+		}
+	}
 
 	/* Get native PHP bundled (internal) function ptr */
 	fnname_ptr = execute_data->func->internal_function.function_name->val;
@@ -1479,14 +1717,12 @@ static void legacy_hash_sort_slow(INTERNAL_FUNCTION_PARAMETERS, zval *array, buc
 		ZVAL_COPY_VALUE(array, &original);
 
 		if (!native_failed && !php_colopl_bc_same_snapshot_value(&legacy, &native, &snapshot_context)) {
-			if (COLOPL_BC_G(php74_sort_mode) & COLOPL_BC_PHP74_SORT_MODE_LOG) {
-				php_log_err_with_severity("Incompatible sort detected", LOG_NOTICE);
-			}
-
-			if (COLOPL_BC_G(php74_sort_mode) & COLOPL_BC_PHP74_SORT_MODE_DEPRECATED) {
-				php_error_docref(NULL, E_DEPRECATED, "Incompatible sort detected");
-			}
+			php_colopl_bc_report_incompatible_sort();
 		}
+	}
+
+	if (user_sort_incompatible && !EG(exception)) {
+		php_colopl_bc_report_incompatible_sort();
 	}
 
 	if (!Z_ISUNDEF(native)) {

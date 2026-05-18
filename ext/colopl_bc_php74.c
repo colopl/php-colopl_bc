@@ -264,8 +264,14 @@ static inline zval *php_colopl_bc_hash_get_ordered_value(HashTable *ht, uint32_t
 
 	if (HT_IS_PACKED(ht)) {
 		while (*pos < ht->nNumUsed) {
+#if PHP_VERSION_ID >= 80200
 			value = ht->arPacked + *pos;
 			*num_key = *pos;
+#else
+			bucket = ht->arData + *pos;
+			value = &bucket->val;
+			*num_key = bucket->h;
+#endif
 			*str_key = NULL;
 			(*pos)++;
 			if (Z_TYPE_P(value) != IS_UNDEF) {

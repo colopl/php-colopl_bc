@@ -1,3 +1,6 @@
+# 13.0.0
+- Fix: compatibility check mode affects side-effects
+
 # 12.1.0
 - Change the project license from PHP-3.01 to BSD-3-Clause
 - Tighten package support to PHP 7.4 or PHP 8.1+

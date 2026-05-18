@@ -1,3 +1,6 @@
+# 13.0.1
+- fix extension version definition
+
 # 13.0.0
 - Fix: compatibility check mode affects side-effects
 

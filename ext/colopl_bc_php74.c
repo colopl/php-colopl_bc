@@ -19,11 +19,360 @@
 
 #include "ext/standard/php_array.h"
 #include "ext/standard/php_string.h"
+#include "zend_exceptions.h"
 #include "zend_operators.h"
 
 /* zend_operators.c */
 
 #define COLOPL_BC_TYPE_PAIR(t1,t2) (((t1) << 4) | (t2))
+
+typedef struct _php_colopl_bc_snapshot_context {
+	HashTable arrays;
+	HashTable objects;
+} php_colopl_bc_snapshot_context;
+
+typedef struct _php_colopl_bc_diagnostic_error_state {
+	int error_reporting;
+	int user_error_handler_error_reporting;
+	bool record_errors;
+} php_colopl_bc_diagnostic_error_state;
+
+static inline void php_colopl_bc_snapshot_context_init(php_colopl_bc_snapshot_context *ctx)
+{
+	zend_hash_init(&ctx->arrays, 8, NULL, NULL, 0);
+	zend_hash_init(&ctx->objects, 8, NULL, NULL, 0);
+}
+
+static inline void php_colopl_bc_snapshot_context_destroy(php_colopl_bc_snapshot_context *ctx)
+{
+	zend_hash_destroy(&ctx->objects);
+	zend_hash_destroy(&ctx->arrays);
+}
+
+static inline void php_colopl_bc_diagnostic_error_state_suppress(php_colopl_bc_diagnostic_error_state *state)
+{
+	state->error_reporting = EG(error_reporting);
+	state->user_error_handler_error_reporting = EG(user_error_handler_error_reporting);
+	state->record_errors = EG(record_errors);
+
+	EG(error_reporting) = 0;
+	EG(user_error_handler_error_reporting) = 0;
+	EG(record_errors) = false;
+}
+
+static inline void php_colopl_bc_diagnostic_error_state_restore(php_colopl_bc_diagnostic_error_state *state)
+{
+	EG(record_errors) = state->record_errors;
+	EG(user_error_handler_error_reporting) = state->user_error_handler_error_reporting;
+	EG(error_reporting) = state->error_reporting;
+}
+
+static inline bool php_colopl_bc_clear_diagnostic_exception(void)
+{
+	if (EG(exception)) {
+		zend_clear_exception();
+
+		return true;
+	}
+
+	return false;
+}
+
+static inline bool php_colopl_bc_zval_contains_object(zval *op, HashTable *seen_arrays)
+{
+	zend_array *array;
+	zval *entry;
+
+	ZVAL_DEREF(op);
+	if (Z_TYPE_P(op) == IS_INDIRECT) {
+		op = Z_INDIRECT_P(op);
+		ZVAL_DEREF(op);
+	}
+
+	switch (Z_TYPE_P(op)) {
+		case IS_OBJECT:
+			return true;
+		case IS_ARRAY:
+			array = Z_ARRVAL_P(op);
+			if (zend_hash_index_exists(seen_arrays, (zend_ulong)(uintptr_t) array)) {
+				return false;
+			}
+			zend_hash_index_add_empty_element(seen_arrays, (zend_ulong)(uintptr_t) array);
+
+			ZEND_HASH_FOREACH_VAL(array, entry) {
+				if (php_colopl_bc_zval_contains_object(entry, seen_arrays)) {
+					return true;
+				}
+			} ZEND_HASH_FOREACH_END();
+
+			return false;
+		default:
+			return false;
+	}
+}
+
+static inline bool php_colopl_bc_zvals_contain_object(zval *op1, zval *op2)
+{
+	HashTable seen_arrays;
+	bool contains_object;
+
+	zend_hash_init(&seen_arrays, 8, NULL, NULL, 0);
+	contains_object =
+		php_colopl_bc_zval_contains_object(op1, &seen_arrays) ||
+		php_colopl_bc_zval_contains_object(op2, &seen_arrays);
+	zend_hash_destroy(&seen_arrays);
+
+	return contains_object;
+}
+
+static inline bool php_colopl_bc_snapshot_zval(zval *dst, zval *src, php_colopl_bc_snapshot_context *ctx)
+{
+	zend_object *src_object, *object, *cached_obj;
+	zend_array *src_array, *array, *cached_arr;
+	zend_ulong num_key;
+	zend_string *str_key;
+	zval *entry, new_entry, *src_prop, *dst_prop;
+	uint32_t i;
+	ptrdiff_t offset;
+
+	ZVAL_DEREF(src);
+
+	switch (Z_TYPE_P(src)) {
+		case IS_ARRAY: {
+			src_array = Z_ARRVAL_P(src);
+			cached_arr = zend_hash_index_find_ptr(&ctx->arrays, (zend_ulong)(uintptr_t) src_array);
+			if (cached_arr != NULL) {
+				GC_ADDREF(cached_arr);
+				ZVAL_ARR(dst, cached_arr);
+
+				return true;
+			}
+
+			array = zend_new_array(zend_hash_num_elements(src_array));
+			ZVAL_ARR(dst, array);
+			zend_hash_index_update_ptr(&ctx->arrays, (zend_ulong)(uintptr_t) src_array, array);
+
+			ZEND_HASH_FOREACH_KEY_VAL(src_array, num_key, str_key, entry) {
+				if (Z_TYPE_P(entry) == IS_INDIRECT) {
+					entry = Z_INDIRECT_P(entry);
+				}
+
+				if (!php_colopl_bc_snapshot_zval(&new_entry, entry, ctx)) {
+					zval_ptr_dtor(dst);
+					ZVAL_UNDEF(dst);
+
+					return false;
+				}
+
+				if (str_key) {
+					zend_hash_update(array, str_key, &new_entry);
+				} else {
+					zend_hash_index_update(array, num_key, &new_entry);
+				}
+			} ZEND_HASH_FOREACH_END();
+
+			return true;
+		}
+		case IS_OBJECT: {
+			src_object = Z_OBJ_P(src);
+			cached_obj = zend_hash_index_find_ptr(&ctx->objects, (zend_ulong)(uintptr_t) src_object);
+			if (cached_obj != NULL) {
+				GC_ADDREF(cached_obj);
+				ZVAL_OBJ(dst, cached_obj);
+
+				return true;
+			}
+
+			if (src_object->handlers != &std_object_handlers) {
+				return false;
+			}
+
+			object = zend_objects_new(src_object->ce);
+
+			zend_object_store_ctor_failed(object);
+			ZVAL_OBJ(dst, object);
+			zend_hash_index_update_ptr(&ctx->objects, (zend_ulong)(uintptr_t) src_object, object);
+
+			for (i = 0; i < src_object->ce->default_properties_count; i++) {
+				src_prop = src_object->properties_table + i;
+				dst_prop = object->properties_table + i;
+
+				ZVAL_UNDEF(dst_prop);
+
+				if (Z_TYPE_P(src_prop) == IS_UNDEF) {
+					continue;
+				}
+
+				if (!php_colopl_bc_snapshot_zval(dst_prop, src_prop, ctx)) {
+					zval_ptr_dtor(dst);
+					ZVAL_UNDEF(dst);
+
+					return false;
+				}
+
+				Z_PROP_FLAG_P(dst_prop) = Z_PROP_FLAG_P(src_prop);
+			}
+
+			if (src_object->properties != NULL && zend_hash_num_elements(src_object->properties) > 0) {
+				object->properties = zend_new_array(zend_hash_num_elements(src_object->properties));
+				zend_hash_real_init_mixed(object->properties);
+
+				ZEND_HASH_FOREACH_KEY_VAL(src_object->properties, num_key, str_key, entry) {
+					if (Z_TYPE_P(entry) == IS_INDIRECT) {
+						offset = Z_INDIRECT_P(entry) - src_object->properties_table;
+						if (offset >= 0 && offset < src_object->ce->default_properties_count) {
+							ZVAL_INDIRECT(&new_entry, object->properties_table + offset);
+						} else {
+							entry = Z_INDIRECT_P(entry);
+							if (!php_colopl_bc_snapshot_zval(&new_entry, entry, ctx)) {
+								zval_ptr_dtor(dst);
+								ZVAL_UNDEF(dst);
+
+								return false;
+							}
+						}
+					} else {
+						if (!php_colopl_bc_snapshot_zval(&new_entry, entry, ctx)) {
+							zval_ptr_dtor(dst);
+							ZVAL_UNDEF(dst);
+
+							return false;
+						}
+						Z_PROP_FLAG_P(&new_entry) = Z_PROP_FLAG_P(entry);
+					}
+
+					if (str_key) {
+						zend_hash_update(object->properties, str_key, &new_entry);
+					} else {
+						zend_hash_index_update(object->properties, num_key, &new_entry);
+					}
+				} ZEND_HASH_FOREACH_END();
+			}
+
+			return true;
+		}
+		default:
+			ZVAL_DUP(dst, src);
+			return true;
+	}
+}
+
+static inline zval *php_colopl_bc_hash_get_ordered_value(HashTable *ht, uint32_t *pos, zend_ulong *num_key, zend_string **str_key)
+{
+	zval *value;
+	Bucket *bucket;
+
+	if (HT_IS_PACKED(ht)) {
+		while (*pos < ht->nNumUsed) {
+			value = ht->arPacked + *pos;
+			*num_key = *pos;
+			*str_key = NULL;
+			(*pos)++;
+			if (Z_TYPE_P(value) != IS_UNDEF) {
+				return value;
+			}
+		}
+	} else {
+		while (*pos < ht->nNumUsed) {
+			bucket = ht->arData + *pos;
+			(*pos)++;
+			if (Z_TYPE(bucket->val) != IS_UNDEF) {
+				*num_key = bucket->h;
+				*str_key = bucket->key;
+				return &bucket->val;
+			}
+		}
+	}
+
+	return NULL;
+}
+
+static inline bool php_colopl_bc_same_snapshot_array_pair_seen(HashTable *seen_arrays, zend_array *legacy_array, zend_array *native_array)
+{
+	uintptr_t pair[2];
+
+	pair[0] = (uintptr_t) legacy_array;
+	pair[1] = (uintptr_t) native_array;
+
+	if (zend_hash_str_exists(seen_arrays, (char *) pair, sizeof(pair))) {
+		return true;
+	}
+	zend_hash_str_add_empty_element(seen_arrays, (char *) pair, sizeof(pair));
+
+	return false;
+}
+
+static inline bool php_colopl_bc_same_snapshot_value_ex(zval *legacy, zval *native, php_colopl_bc_snapshot_context *ctx, HashTable *seen_arrays)
+{
+	zend_object *snapshot;
+	zend_array *legacy_array, *native_array;
+	zend_ulong legacy_num_key, native_num_key;
+	zend_string *legacy_str_key, *native_str_key;
+	zval *legacy_value, *native_value;
+	uint32_t legacy_pos, native_pos;
+
+	ZVAL_DEREF(legacy);
+	ZVAL_DEREF(native);
+
+	if (Z_TYPE_P(legacy) == IS_OBJECT && Z_TYPE_P(native) == IS_OBJECT) {
+		snapshot = zend_hash_index_find_ptr(&ctx->objects, (zend_ulong)(uintptr_t) Z_OBJ_P(legacy));
+		if (snapshot != NULL && snapshot == Z_OBJ_P(native)) {
+			return true;
+		}
+	}
+
+	if (Z_TYPE_P(legacy) != IS_ARRAY || Z_TYPE_P(native) != IS_ARRAY) {
+		return zend_is_identical(legacy, native);
+	}
+
+	legacy_array = Z_ARRVAL_P(legacy);
+	native_array = Z_ARRVAL_P(native);
+	if (php_colopl_bc_same_snapshot_array_pair_seen(seen_arrays, legacy_array, native_array)) {
+		return true;
+	}
+
+	if (zend_hash_num_elements(legacy_array) != zend_hash_num_elements(native_array)) {
+		return false;
+	}
+
+	legacy_pos = native_pos = 0;
+	while ((legacy_value = php_colopl_bc_hash_get_ordered_value(legacy_array, &legacy_pos, &legacy_num_key, &legacy_str_key)) != NULL) {
+		native_value = php_colopl_bc_hash_get_ordered_value(native_array, &native_pos, &native_num_key, &native_str_key);
+
+		if (native_value == NULL) {
+			return false;
+		}
+
+		if (legacy_str_key != NULL || native_str_key != NULL) {
+			if (legacy_str_key == NULL || native_str_key == NULL) {
+				return false;
+			}
+			if (!zend_string_equals(legacy_str_key, native_str_key)) {
+				return false;
+			}
+		} else if (legacy_num_key != native_num_key) {
+			return false;
+		}
+
+		if (!php_colopl_bc_same_snapshot_value_ex(legacy_value, native_value, ctx, seen_arrays)) {
+			return false;
+		}
+	}
+
+	return php_colopl_bc_hash_get_ordered_value(native_array, &native_pos, &native_num_key, &native_str_key) == NULL;
+}
+
+static inline bool php_colopl_bc_same_snapshot_value(zval *legacy, zval *native, php_colopl_bc_snapshot_context *ctx)
+{
+	HashTable seen_arrays;
+	bool same;
+
+	zend_hash_init(&seen_arrays, 8, NULL, NULL, 0);
+	same = php_colopl_bc_same_snapshot_value_ex(legacy, native, ctx, &seen_arrays);
+	zend_hash_destroy(&seen_arrays);
+
+	return same;
+}
 
 static inline void php_colopl_bc_convert_object_to_type(zval *op, zval *dst, uint32_t ctype)
 {
@@ -190,10 +539,33 @@ static int legacy_compare_fast(zval *op1, zval *op2)
 
 static int legacy_compare_slow(zval *op1, zval *op2)
 {
-	int bc = legacy_compare_fast(op1, op2);
-	int native = zend_compare(op1, op2);
+	php_colopl_bc_snapshot_context snapshot_context;
+	php_colopl_bc_diagnostic_error_state error_state;
+	zval native_op1, native_op2;
+	bool have_native_snapshot, native_failed;
+	int bc, native;
 
-	if (native != bc) {
+	ZVAL_UNDEF(&native_op1);
+	ZVAL_UNDEF(&native_op2);
+	php_colopl_bc_snapshot_context_init(&snapshot_context);
+	have_native_snapshot = !php_colopl_bc_zvals_contain_object(op1, op2) &&
+		php_colopl_bc_snapshot_zval(&native_op1, op1, &snapshot_context) &&
+		php_colopl_bc_snapshot_zval(&native_op2, op2, &snapshot_context)
+	;
+
+	bc = legacy_compare_fast(op1, op2);
+
+	if (have_native_snapshot && !EG(exception)) {
+		php_colopl_bc_diagnostic_error_state_suppress(&error_state);
+		native = zend_compare(&native_op1, &native_op2);
+		native_failed = php_colopl_bc_clear_diagnostic_exception();
+		php_colopl_bc_diagnostic_error_state_restore(&error_state);
+	} else {
+		native = bc;
+		native_failed = false;
+	}
+
+	if (have_native_snapshot && !native_failed && native != bc) {
 		if (COLOPL_BC_G(php74_compare_mode) & COLOPL_BC_PHP74_COMPARE_MODE_LOG) {
 			php_log_err_with_severity("Incompatible compare detected", LOG_NOTICE);
 		}
@@ -201,6 +573,16 @@ static int legacy_compare_slow(zval *op1, zval *op2)
 			php_error_docref(NULL, E_DEPRECATED, "Incompatible compare detected");
 		}
 	}
+
+	if (!Z_ISUNDEF(native_op2)) {
+		zval_ptr_dtor(&native_op2);
+	}
+
+	if (!Z_ISUNDEF(native_op1)) {
+		zval_ptr_dtor(&native_op1);
+	}
+
+	php_colopl_bc_snapshot_context_destroy(&snapshot_context);
 
 	return bc;
 }
@@ -925,20 +1307,36 @@ static inline void php_colopl_bc_search_array(INTERNAL_FUNCTION_PARAMETERS, int 
 	COLOPL_BC_G(user_compare_fci) = old_user_compare_fci; \
 	COLOPL_BC_G(user_compare_fci_cache) = old_user_compare_fci_cache; \
 
-static void legacy_hash_sort_fast(INTERNAL_FUNCTION_PARAMETERS, zval *array, bucket_compare_func_t comapre_func, bool renumber)
+static void legacy_hash_sort_fast(INTERNAL_FUNCTION_PARAMETERS, zval *array, bucket_compare_func_t comapre_func, bool renumber, bool compare_func_may_call_user_code)
 {
+	(void) compare_func_may_call_user_code;
+
 	zend_hash_sort(Z_ARRVAL_P(array), comapre_func, renumber);
 }
 
-static void legacy_hash_sort_slow(INTERNAL_FUNCTION_PARAMETERS, zval *array, bucket_compare_func_t compare_func, bool renumber)
+static void legacy_hash_sort_slow(INTERNAL_FUNCTION_PARAMETERS, zval *array, bucket_compare_func_t compare_func, bool renumber, bool compare_func_may_call_user_code)
 {
-	zval legacy;
+	php_colopl_bc_snapshot_context snapshot_context;
+	php_colopl_bc_diagnostic_error_state error_state;
 	zend_internal_function *fn;
+	HashTable seen_arrays;
+	zval legacy, native, original;
+	bool have_native_snapshot, native_failed = false, may_call_user_code = compare_func_may_call_user_code;
 	char *fnname_ptr;
 
+	ZVAL_UNDEF(&native);
 	ZVAL_DUP(&legacy, array);
+	php_colopl_bc_snapshot_context_init(&snapshot_context);
 
-	legacy_hash_sort_fast(INTERNAL_FUNCTION_PARAM_PASSTHRU, &legacy, compare_func, renumber);
+	if (!may_call_user_code) {
+		zend_hash_init(&seen_arrays, 8, NULL, NULL, 0);
+		may_call_user_code = php_colopl_bc_zval_contains_object(array, &seen_arrays);
+		zend_hash_destroy(&seen_arrays);
+	}
+
+	have_native_snapshot = !may_call_user_code && php_colopl_bc_snapshot_zval(&native, array, &snapshot_context);
+
+	legacy_hash_sort_fast(INTERNAL_FUNCTION_PARAM_PASSTHRU, &legacy, compare_func, renumber, compare_func_may_call_user_code);
 
 	/* Get native PHP bundled (internal) function ptr */
 	fnname_ptr = execute_data->func->internal_function.function_name->val;
@@ -953,19 +1351,33 @@ static void legacy_hash_sort_slow(INTERNAL_FUNCTION_PARAMETERS, zval *array, buc
 		++fnname_ptr;
 	}
 	fn = zend_hash_str_find_ptr(EG(function_table), fnname_ptr, strlen(fnname_ptr));
-	if (EXPECTED(fn != NULL)) {
-		/* Passthrough PHP bundled (internal) function */
-		fn->handler(INTERNAL_FUNCTION_PARAM_PASSTHRU);
+	if (EXPECTED(fn != NULL) && have_native_snapshot && !EG(exception)) {
+		ZVAL_COPY_VALUE(&original, array);
+		ZVAL_COPY_VALUE(array, &native);
 
-		if (!zend_is_identical(&legacy, array)) {
+		php_colopl_bc_diagnostic_error_state_suppress(&error_state);
+		fn->handler(INTERNAL_FUNCTION_PARAM_PASSTHRU);
+		native_failed = php_colopl_bc_clear_diagnostic_exception();
+		php_colopl_bc_diagnostic_error_state_restore(&error_state);
+		ZVAL_COPY_VALUE(&native, array);
+		ZVAL_COPY_VALUE(array, &original);
+
+		if (!native_failed && !php_colopl_bc_same_snapshot_value(&legacy, &native, &snapshot_context)) {
 			if (COLOPL_BC_G(php74_sort_mode) & COLOPL_BC_PHP74_SORT_MODE_LOG) {
 				php_log_err_with_severity("Incompatible sort detected", LOG_NOTICE);
 			}
+
 			if (COLOPL_BC_G(php74_sort_mode) & COLOPL_BC_PHP74_SORT_MODE_DEPRECATED) {
 				php_error_docref(NULL, E_DEPRECATED, "Incompatible sort detected");
 			}
 		}
 	}
+
+	if (!Z_ISUNDEF(native)) {
+		zval_ptr_dtor(&native);
+	}
+
+	php_colopl_bc_snapshot_context_destroy(&snapshot_context);
 
 	zval_ptr_dtor(array);
 	ZVAL_ARR(array, Z_ARRVAL(legacy));
@@ -1005,7 +1417,7 @@ static void php_colopl_bc_usort(INTERNAL_FUNCTION_PARAMETERS, bucket_compare_fun
 		RETURN_TRUE;
 	}
 
-	COLOPL_BC_G(php74_hash_sort_func)(INTERNAL_FUNCTION_PARAM_PASSTHRU, &arr, compare_func, renumber);
+	COLOPL_BC_G(php74_hash_sort_func)(INTERNAL_FUNCTION_PARAM_PASSTHRU, &arr, compare_func, renumber, true);
 
 	zval_ptr_dtor(array);
 	ZVAL_ARR(array, Z_ARRVAL(arr));
@@ -1028,7 +1440,7 @@ PHP_FUNCTION(Colopl_ColoplBc_Php74_ksort)
 
 	cmp = php_colopl_bc_get_key_compare_func(sort_type, 0);
 
-	COLOPL_BC_G(php74_hash_sort_func)(INTERNAL_FUNCTION_PARAM_PASSTHRU, array, cmp, 0);
+	COLOPL_BC_G(php74_hash_sort_func)(INTERNAL_FUNCTION_PARAM_PASSTHRU, array, cmp, 0, false);
 
 	RETURN_TRUE;
 }
@@ -1047,7 +1459,7 @@ PHP_FUNCTION(Colopl_ColoplBc_Php74_krsort)
 
 	cmp = php_colopl_bc_get_key_compare_func(sort_type, 1);
 
-	COLOPL_BC_G(php74_hash_sort_func)(INTERNAL_FUNCTION_PARAM_PASSTHRU, array, cmp, 0);
+	COLOPL_BC_G(php74_hash_sort_func)(INTERNAL_FUNCTION_PARAM_PASSTHRU, array, cmp, 0, false);
 
 	RETURN_TRUE;
 }
@@ -1066,7 +1478,7 @@ PHP_FUNCTION(Colopl_ColoplBc_Php74_asort)
 
 	cmp = php_colopl_bc_get_data_compare_func(sort_type, 0);
 
-	COLOPL_BC_G(php74_hash_sort_func)(INTERNAL_FUNCTION_PARAM_PASSTHRU, array, cmp, 0);
+	COLOPL_BC_G(php74_hash_sort_func)(INTERNAL_FUNCTION_PARAM_PASSTHRU, array, cmp, 0, false);
 
 	RETURN_TRUE;
 }
@@ -1085,7 +1497,7 @@ PHP_FUNCTION(Colopl_ColoplBc_Php74_arsort)
 
 	cmp = php_colopl_bc_get_data_compare_func(sort_type, 1);
 
-	COLOPL_BC_G(php74_hash_sort_func)(INTERNAL_FUNCTION_PARAM_PASSTHRU, array, cmp, 0);
+	COLOPL_BC_G(php74_hash_sort_func)(INTERNAL_FUNCTION_PARAM_PASSTHRU, array, cmp, 0, false);
 
 	RETURN_TRUE;
 }
@@ -1104,7 +1516,7 @@ PHP_FUNCTION(Colopl_ColoplBc_Php74_sort)
 
 	cmp = php_colopl_bc_get_data_compare_func(sort_type, 0);
 
-	COLOPL_BC_G(php74_hash_sort_func)(INTERNAL_FUNCTION_PARAM_PASSTHRU, array, cmp, 1);
+	COLOPL_BC_G(php74_hash_sort_func)(INTERNAL_FUNCTION_PARAM_PASSTHRU, array, cmp, 1, false);
 
 	RETURN_TRUE;
 }
@@ -1123,7 +1535,7 @@ PHP_FUNCTION(Colopl_ColoplBc_Php74_rsort)
 
 	cmp = php_colopl_bc_get_data_compare_func(sort_type, 1);
 
-	COLOPL_BC_G(php74_hash_sort_func)(INTERNAL_FUNCTION_PARAM_PASSTHRU, array, cmp, 1);
+	COLOPL_BC_G(php74_hash_sort_func)(INTERNAL_FUNCTION_PARAM_PASSTHRU, array, cmp, 1, false);
 
 	RETURN_TRUE;
 }

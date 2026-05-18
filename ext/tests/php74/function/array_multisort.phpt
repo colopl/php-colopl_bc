@@ -1,5 +1,7 @@
 --TEST--
 Check for \Colopl\ColoplBc\Php74\array_multisort() function. (colopl_bc.php74.compare_mode=3)
+--EXTENSIONS--
+colopl_bc
 --INI--
 date.timezone=UTC
 error_log=

@@ -69,6 +69,8 @@ PHP_GINIT_FUNCTION(colopl_bc)
 #if defined(ZTS) && defined(COMPILE_DL_COLOPL_BC)
 	ZEND_TSRMLS_CACHE_UPDATE();
 #endif
+
+	colopl_bc_globals->php74_user_sort_context = NULL;
 }
 
 zend_module_entry colopl_bc_module_entry = {

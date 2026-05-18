@@ -65,9 +65,6 @@ Deprecated: Colopl\ColoplBc\Php74\ksort(): Incompatible sort detected in %s on l
 Deprecated: Colopl\ColoplBc\Php74\uasort(): Incompatible sort detected in %s on line %d
 
 Deprecated: Colopl\ColoplBc\Php74\uksort(): Incompatible sort detected in %s on line %d
-
-Deprecated: Colopl\ColoplBc\Php74\usort(): Incompatible sort detected in %s on line %d
-Incompatible sort detected
 Incompatible sort detected
 Incompatible sort detected
 Incompatible sort detected
@@ -92,6 +89,3 @@ Deprecated: Colopl\ColoplBc\Php74\uasort(): Incompatible sort detected in %s on 
 Incompatible sort detected
 
 Deprecated: Colopl\ColoplBc\Php74\uksort(): Incompatible sort detected in %s on line %d
-Incompatible sort detected
-
-Deprecated: Colopl\ColoplBc\Php74\usort(): Incompatible sort detected in %s on line %d

@@ -58,7 +58,8 @@ ZEND_BEGIN_MODULE_GLOBALS(colopl_bc)
 	zend_long php74_compare_mode;
 	int (*php74_compare_func)(zval *op1, zval *op2);
 	zend_long php74_sort_mode;
- 	void (*php74_hash_sort_func)(INTERNAL_FUNCTION_PARAMETERS, zval *array, bucket_compare_func_t compare_func, bool renumber);
+	void (*php74_hash_sort_func)(INTERNAL_FUNCTION_PARAMETERS, zval *array, bucket_compare_func_t compare_func, bool renumber, bool compare_func_may_call_user_code);
+	void *php74_user_sort_context;
 ZEND_END_MODULE_GLOBALS(colopl_bc)
 
 ZEND_EXTERN_MODULE_GLOBALS(colopl_bc)

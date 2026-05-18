@@ -112,17 +112,11 @@ int(1) == bool(true)
 int(1) != bool(false)
 int(1)
 Notice: Object of class stdClass could not be converted to int in %s on line %d
-
-Notice: Object of class stdClass could not be converted to int in %s on line %d
  == object(stdClass)#%d (0) {}
 int(1)
 Notice: Object of class stdClass could not be converted to int in %s on line %d
-
-Notice: Object of class stdClass could not be converted to int in %s on line %d
  == object(stdClass)#%d (0) {}
 int(1)
-Notice: Object of class test could not be converted to int in %s on line %d
-
 Notice: Object of class test could not be converted to int in %s on line %d
  == object(test)#%d (0) {}
 int(1) != array(0) {}
@@ -144,17 +138,11 @@ float(2.5) == bool(true)
 float(2.5) != bool(false)
 float(2.5)
 Notice: Object of class stdClass could not be converted to float in %s on line %d
-
-Notice: Object of class stdClass could not be converted to float in %s on line %d
  != object(stdClass)#%d (0) {}
 float(2.5)
 Notice: Object of class stdClass could not be converted to float in %s on line %d
-
-Notice: Object of class stdClass could not be converted to float in %s on line %d
  != object(stdClass)#%d (0) {}
 float(2.5)
-Notice: Object of class test could not be converted to float in %s on line %d
-
 Notice: Object of class test could not be converted to float in %s on line %d
  != object(test)#%d (0) {}
 float(2.5) != array(0) {}
@@ -179,17 +167,11 @@ int(0) != bool(true)
 int(0) == bool(false)
 int(0)
 Notice: Object of class stdClass could not be converted to int in %s on line %d
-
-Notice: Object of class stdClass could not be converted to int in %s on line %d
  != object(stdClass)#%d (0) {}
 int(0)
 Notice: Object of class stdClass could not be converted to int in %s on line %d
-
-Notice: Object of class stdClass could not be converted to int in %s on line %d
  != object(stdClass)#%d (0) {}
 int(0)
-Notice: Object of class test could not be converted to int in %s on line %d
-
 Notice: Object of class test could not be converted to int in %s on line %d
  != object(test)#%d (0) {}
 int(0) != array(0) {}
@@ -310,17 +292,11 @@ object(stdClass)#%d (0) {} != array(3) {  [0]=>  int(1)  [1]=>  int(2)  [2]=>  i
 object(stdClass)#%d (0) {} != string(0) ""
 object(stdClass)#%d (0) {}
 Notice: Object of class stdClass could not be converted to int in %s on line %d
-
-Notice: Object of class stdClass could not be converted to int in %s on line %d
  == int(1)
 object(stdClass)#%d (0) {}
 Notice: Object of class stdClass could not be converted to float in %s on line %d
-
-Notice: Object of class stdClass could not be converted to float in %s on line %d
  != float(2.5)
 object(stdClass)#%d (0) {}
-Notice: Object of class stdClass could not be converted to int in %s on line %d
-
 Notice: Object of class stdClass could not be converted to int in %s on line %d
  != int(0)
 object(stdClass)#%d (0) {} != string(6) "string"
@@ -334,8 +310,6 @@ object(stdClass)#%d (0) {} == object(stdClass)#%d (0) {}
 object(stdClass)#%d (0) {} != object(test)#%d (0) {}
 object(stdClass)#%d (0) {} != array(0) {}
 object(stdClass)#%d (0) {}
-Notice: Object of class stdClass could not be converted to int in %s on line %d
-
 Notice: Object of class stdClass could not be converted to int in %s on line %d
  != int(-2147483648)
 object(stdClass)#%d (0) {} != string(11) "-2147483648"
@@ -343,17 +317,11 @@ object(stdClass)#%d (0) {} != array(3) {  [0]=>  int(1)  [1]=>  int(2)  [2]=>  i
 object(stdClass)#%d (0) {} != string(0) ""
 object(stdClass)#%d (0) {}
 Notice: Object of class stdClass could not be converted to int in %s on line %d
-
-Notice: Object of class stdClass could not be converted to int in %s on line %d
  == int(1)
 object(stdClass)#%d (0) {}
 Notice: Object of class stdClass could not be converted to float in %s on line %d
-
-Notice: Object of class stdClass could not be converted to float in %s on line %d
  != float(2.5)
 object(stdClass)#%d (0) {}
-Notice: Object of class stdClass could not be converted to int in %s on line %d
-
 Notice: Object of class stdClass could not be converted to int in %s on line %d
  != int(0)
 object(stdClass)#%d (0) {} != string(6) "string"
@@ -368,25 +336,17 @@ object(stdClass)#%d (0) {} != object(test)#%d (0) {}
 object(stdClass)#%d (0) {} != array(0) {}
 object(stdClass)#%d (0) {}
 Notice: Object of class stdClass could not be converted to int in %s on line %d
-
-Notice: Object of class stdClass could not be converted to int in %s on line %d
  != int(-2147483648)
 object(stdClass)#%d (0) {} != string(11) "-2147483648"
 object(test)#%d (0) {} != array(3) {  [0]=>  int(1)  [1]=>  int(2)  [2]=>  int(3)}
 object(test)#%d (0) {} != string(0) ""
 object(test)#%d (0) {}
 Notice: Object of class test could not be converted to int in %s on line %d
-
-Notice: Object of class test could not be converted to int in %s on line %d
  == int(1)
 object(test)#%d (0) {}
 Notice: Object of class test could not be converted to float in %s on line %d
-
-Notice: Object of class test could not be converted to float in %s on line %d
  != float(2.5)
 object(test)#%d (0) {}
-Notice: Object of class test could not be converted to int in %s on line %d
-
 Notice: Object of class test could not be converted to int in %s on line %d
  != int(0)
 object(test)#%d (0) {} != string(6) "string"
@@ -400,8 +360,6 @@ object(test)#%d (0) {} != object(stdClass)#%d (0) {}
 object(test)#%d (0) {} == object(test)#%d (0) {}
 object(test)#%d (0) {} != array(0) {}
 object(test)#%d (0) {}
-Notice: Object of class test could not be converted to int in %s on line %d
-
 Notice: Object of class test could not be converted to int in %s on line %d
  != int(-2147483648)
 object(test)#%d (0) {} != string(11) "-2147483648"
@@ -438,17 +396,11 @@ int(-2147483648) == bool(true)
 int(-2147483648) != bool(false)
 int(-2147483648)
 Notice: Object of class stdClass could not be converted to int in %s on line %d
-
-Notice: Object of class stdClass could not be converted to int in %s on line %d
  != object(stdClass)#%d (0) {}
 int(-2147483648)
 Notice: Object of class stdClass could not be converted to int in %s on line %d
-
-Notice: Object of class stdClass could not be converted to int in %s on line %d
  != object(stdClass)#%d (0) {}
 int(-2147483648)
-Notice: Object of class test could not be converted to int in %s on line %d
-
 Notice: Object of class test could not be converted to int in %s on line %d
  != object(test)#%d (0) {}
 int(-2147483648) != array(0) {}

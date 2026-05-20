@@ -50,7 +50,7 @@ $ mkdir -p "artifacts"
 $ docker run --rm -e VERSION="x.y.z" -v "$(pwd)/artifacts:/tmp/artifacts" "colopl-bc-u2204-php81"
 ```
 
-This target produces `php-colopl-bc` and `php8.1-colopl-bc` binary packages together with the corresponding `.changes` and `.buildinfo` files.
+This target produces `php8.1-colopl-bc_x.y.z_<arch>_ubuntu22.04_default.deb`.
 
 Build packages for Ubuntu 22.04 with the Ondrej Sury PHP 8.4 repository:
 
@@ -60,7 +60,7 @@ $ mkdir -p "artifacts"
 $ docker run --rm -e VERSION="x.y.z" -v "$(pwd)/artifacts:/tmp/artifacts" "colopl-bc-u2204-php84"
 ```
 
-This target produces the `php8.4-colopl-bc` binary package together with the corresponding `.changes` and `.buildinfo` files.
+This target produces `php8.4-colopl-bc_x.y.z_<arch>_ubuntu22.04_sury.deb`.
 
 The library is installed in the following steps.
 

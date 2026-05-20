@@ -10,16 +10,6 @@ Build-Depends:
  php8.5-cli,
  php8.5-dev
 
-Package: php-colopl-bc
-Section: php
-Architecture: all
-Depends:
- ${misc:Depends},
- php8.5-colopl-bc
-Description: Meta package for the COLOPL backwards compatibility extension
- This package depends on the Ubuntu 26.04 build of the colopl_bc extension
- for PHP 8.5.
-
 Package: php8.5-colopl-bc
 Section: php
 Architecture: any

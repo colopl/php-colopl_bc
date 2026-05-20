@@ -10,16 +10,6 @@ Build-Depends:
  php8.1-cli,
  php8.1-dev
 
-Package: php-colopl-bc
-Section: php
-Architecture: all
-Depends:
- ${misc:Depends},
- php8.1-colopl-bc
-Description: Meta package for the COLOPL backwards compatibility extension
- This package depends on the Ubuntu 22.04 build of the colopl_bc extension
- for PHP 8.1.
-
 Package: php8.1-colopl-bc
 Section: php
 Architecture: any

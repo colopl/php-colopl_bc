@@ -45,42 +45,36 @@ jobs:
             dockerfile: build/ubuntu2204/Dockerfile
             image_name: colopl-bc-u2204-php81
             artifact_name: ubuntu2204-php81-amd64-debs
-            prune_meta_package: false
           - runs-on: ubuntu-24.04-arm
             platform: linux/arm64
             arch: arm64
             dockerfile: build/ubuntu2204/Dockerfile
             image_name: colopl-bc-u2204-php81
             artifact_name: ubuntu2204-php81-arm64-debs
-            prune_meta_package: true
           - runs-on: ubuntu-24.04
             platform: linux/amd64
             arch: amd64
             dockerfile: build/ubuntu2204_sury84/Dockerfile
             image_name: colopl-bc-u2204-sury84-php84
             artifact_name: ubuntu2204-sury84-php84-amd64-debs
-            prune_meta_package: false
           - runs-on: ubuntu-24.04-arm
             platform: linux/arm64
             arch: arm64
             dockerfile: build/ubuntu2204_sury84/Dockerfile
             image_name: colopl-bc-u2204-sury84-php84
             artifact_name: ubuntu2204-sury84-php84-arm64-debs
-            prune_meta_package: false
           - runs-on: ubuntu-24.04
             platform: linux/amd64
             arch: amd64
             dockerfile: build/ubuntu2604/Dockerfile
             image_name: colopl-bc-u2604-php85
             artifact_name: ubuntu2604-php85-amd64-debs
-            prune_meta_package: false
           - runs-on: ubuntu-24.04-arm
             platform: linux/arm64
             arch: arm64
             dockerfile: build/ubuntu2604/Dockerfile
             image_name: colopl-bc-u2604-php85
             artifact_name: ubuntu2604-php85-arm64-debs
-            prune_meta_package: false
     steps:
       - name: Checkout
         uses: actions/checkout@v6
@@ -100,9 +94,6 @@ jobs:
             -e VERSION="${{ needs.CreateDraftRelease.outputs.package_version }}" \
             -v "${PWD}/artifacts:/tmp/artifacts" \
             "${{ matrix.image_name }}:${{ matrix.arch }}"
-      - name: Remove duplicated meta package
-        if: matrix.prune_meta_package
-        run: rm -f artifacts/php-colopl-bc_*_all.deb
       - name: Upload deb package artifacts
         uses: actions/upload-artifact@v7
         with:

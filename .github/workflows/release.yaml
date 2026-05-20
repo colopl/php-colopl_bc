@@ -67,14 +67,14 @@ jobs:
             image_name: colopl-bc-u2204-sury84-php84
             artifact_name: ubuntu2204-sury84-php84-arm64-debs
             prune_meta_package: false
-          - runs-on: ubuntu-26.04
+          - runs-on: ubuntu-24.04
             platform: linux/amd64
             arch: amd64
             dockerfile: build/ubuntu2604/Dockerfile
             image_name: colopl-bc-u2604-php85
             artifact_name: ubuntu2604-php85-amd64-debs
             prune_meta_package: false
-          - runs-on: ubuntu-26.04-arm
+          - runs-on: ubuntu-24.04-arm
             platform: linux/arm64
             arch: arm64
             dockerfile: build/ubuntu2604/Dockerfile

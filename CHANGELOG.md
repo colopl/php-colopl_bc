@@ -1,3 +1,6 @@
+# 13.0.2
+- Add Ubuntu 26.04 LTS deb package build
+
 # 13.0.1
 - fix extension version definition
 

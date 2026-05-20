@@ -59,6 +59,15 @@ jobs:
         version: ['8.1', '8.2', '8.3', '8.4', '8.5']
         arch: ['x64', 'x86']
         ts: ['ts', 'nts']
+        exclude:
+          - runs-on: windows-2025
+            version: '8.4'
+            arch: x86
+            ts: nts
+          - runs-on: windows-2025
+            version: '8.5'
+            arch: x86
+            ts: nts
     steps:
       - name: Download prepared workspace
         uses: actions/download-artifact@v8

@@ -16,7 +16,14 @@ permissions:
   id-token: write
   pull-requests: write
 jobs:
+  Approval:
+    runs-on: ubuntu-latest
+    environment: ${{ github.event.pull_request.user.login == 'renovate[bot]' && 'renovate-ci-approval' || '' }}
+    steps:
+      - name: Approved
+        run: echo "CI execution approved (or no approval gate required for this event)."
   Prepare:
+    needs: Approval
     uses: ./.github/workflows/ci_prepare.yaml
   Linux_Native:
     needs: Prepare

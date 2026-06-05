@@ -21,7 +21,7 @@ var_dump($calls > 0 && $calls < 300);
 var_dump(array_slice($array, 0, 5));
 ?>
 --EXPECTF--
-Incompatible sort detected
+Incompatible sort detected in %s on line %d
 
 Deprecated: Colopl\ColoplBc\Php74\usort(): Incompatible sort detected in %s on line %d
 bool(true)

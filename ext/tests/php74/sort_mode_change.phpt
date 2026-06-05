@@ -65,27 +65,27 @@ Deprecated: Colopl\ColoplBc\Php74\ksort(): Incompatible sort detected in %s on l
 Deprecated: Colopl\ColoplBc\Php74\uasort(): Incompatible sort detected in %s on line %d
 
 Deprecated: Colopl\ColoplBc\Php74\uksort(): Incompatible sort detected in %s on line %d
-Incompatible sort detected
-Incompatible sort detected
-Incompatible sort detected
-Incompatible sort detected
-Incompatible sort detected
-Incompatible sort detected
-Incompatible sort detected
+Incompatible sort detected in %s on line %d
+Incompatible sort detected in %s on line %d
+Incompatible sort detected in %s on line %d
+Incompatible sort detected in %s on line %d
+Incompatible sort detected in %s on line %d
+Incompatible sort detected in %s on line %d
+Incompatible sort detected in %s on line %d
 
 Deprecated: Colopl\ColoplBc\Php74\arsort(): Incompatible sort detected in %s on line %d
-Incompatible sort detected
+Incompatible sort detected in %s on line %d
 
 Deprecated: Colopl\ColoplBc\Php74\asort(): Incompatible sort detected in %s on line %d
-Incompatible sort detected
+Incompatible sort detected in %s on line %d
 
 Deprecated: Colopl\ColoplBc\Php74\krsort(): Incompatible sort detected in %s on line %d
-Incompatible sort detected
+Incompatible sort detected in %s on line %d
 
 Deprecated: Colopl\ColoplBc\Php74\ksort(): Incompatible sort detected in %s on line %d
-Incompatible sort detected
+Incompatible sort detected in %s on line %d
 
 Deprecated: Colopl\ColoplBc\Php74\uasort(): Incompatible sort detected in %s on line %d
-Incompatible sort detected
+Incompatible sort detected in %s on line %d
 
 Deprecated: Colopl\ColoplBc\Php74\uksort(): Incompatible sort detected in %s on line %d

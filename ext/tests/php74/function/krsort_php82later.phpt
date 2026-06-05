@@ -16,7 +16,7 @@ $array = ['0' => 1, '' => 1, 'a' => 1];
 var_dump($array);
 ?>
 --EXPECTF--
-Incompatible sort detected
+Incompatible sort detected in %s on line %d
 
 Deprecated: Colopl\ColoplBc\Php74\krsort(): Incompatible sort detected in %s on line %d
 array(3) {

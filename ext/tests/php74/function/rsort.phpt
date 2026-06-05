@@ -14,232 +14,232 @@ $array = ['0', 0, '', '0', 0, '', '0', 0, '', '0', 0, '', '0', 0, '', '0', 0, ''
 var_dump($array);
 ?>
 --EXPECTF--
-Incompatible compare detected
+Incompatible compare detected in %s on line %d
 
 Deprecated: Colopl\ColoplBc\Php74\rsort(): Incompatible compare detected in %s on line %d
-Incompatible compare detected
+Incompatible compare detected in %s on line %d
 
 Deprecated: Colopl\ColoplBc\Php74\rsort(): Incompatible compare detected in %s on line %d
-Incompatible compare detected
+Incompatible compare detected in %s on line %d
 
 Deprecated: Colopl\ColoplBc\Php74\rsort(): Incompatible compare detected in %s on line %d
-Incompatible compare detected
+Incompatible compare detected in %s on line %d
 
 Deprecated: Colopl\ColoplBc\Php74\rsort(): Incompatible compare detected in %s on line %d
-Incompatible compare detected
+Incompatible compare detected in %s on line %d
 
 Deprecated: Colopl\ColoplBc\Php74\rsort(): Incompatible compare detected in %s on line %d
-Incompatible compare detected
+Incompatible compare detected in %s on line %d
 
 Deprecated: Colopl\ColoplBc\Php74\rsort(): Incompatible compare detected in %s on line %d
-Incompatible compare detected
+Incompatible compare detected in %s on line %d
 
 Deprecated: Colopl\ColoplBc\Php74\rsort(): Incompatible compare detected in %s on line %d
-Incompatible compare detected
+Incompatible compare detected in %s on line %d
 
 Deprecated: Colopl\ColoplBc\Php74\rsort(): Incompatible compare detected in %s on line %d
-Incompatible compare detected
+Incompatible compare detected in %s on line %d
 
 Deprecated: Colopl\ColoplBc\Php74\rsort(): Incompatible compare detected in %s on line %d
-Incompatible compare detected
+Incompatible compare detected in %s on line %d
 
 Deprecated: Colopl\ColoplBc\Php74\rsort(): Incompatible compare detected in %s on line %d
-Incompatible compare detected
+Incompatible compare detected in %s on line %d
 
 Deprecated: Colopl\ColoplBc\Php74\rsort(): Incompatible compare detected in %s on line %d
-Incompatible compare detected
+Incompatible compare detected in %s on line %d
 
 Deprecated: Colopl\ColoplBc\Php74\rsort(): Incompatible compare detected in %s on line %d
-Incompatible compare detected
+Incompatible compare detected in %s on line %d
 
 Deprecated: Colopl\ColoplBc\Php74\rsort(): Incompatible compare detected in %s on line %d
-Incompatible compare detected
+Incompatible compare detected in %s on line %d
 
 Deprecated: Colopl\ColoplBc\Php74\rsort(): Incompatible compare detected in %s on line %d
-Incompatible compare detected
+Incompatible compare detected in %s on line %d
 
 Deprecated: Colopl\ColoplBc\Php74\rsort(): Incompatible compare detected in %s on line %d
-Incompatible compare detected
+Incompatible compare detected in %s on line %d
 
 Deprecated: Colopl\ColoplBc\Php74\rsort(): Incompatible compare detected in %s on line %d
-Incompatible compare detected
+Incompatible compare detected in %s on line %d
 
 Deprecated: Colopl\ColoplBc\Php74\rsort(): Incompatible compare detected in %s on line %d
-Incompatible compare detected
+Incompatible compare detected in %s on line %d
 
 Deprecated: Colopl\ColoplBc\Php74\rsort(): Incompatible compare detected in %s on line %d
-Incompatible compare detected
+Incompatible compare detected in %s on line %d
 
 Deprecated: Colopl\ColoplBc\Php74\rsort(): Incompatible compare detected in %s on line %d
-Incompatible compare detected
+Incompatible compare detected in %s on line %d
 
 Deprecated: Colopl\ColoplBc\Php74\rsort(): Incompatible compare detected in %s on line %d
-Incompatible compare detected
+Incompatible compare detected in %s on line %d
 
 Deprecated: Colopl\ColoplBc\Php74\rsort(): Incompatible compare detected in %s on line %d
-Incompatible compare detected
+Incompatible compare detected in %s on line %d
 
 Deprecated: Colopl\ColoplBc\Php74\rsort(): Incompatible compare detected in %s on line %d
-Incompatible compare detected
+Incompatible compare detected in %s on line %d
 
 Deprecated: Colopl\ColoplBc\Php74\rsort(): Incompatible compare detected in %s on line %d
-Incompatible compare detected
+Incompatible compare detected in %s on line %d
 
 Deprecated: Colopl\ColoplBc\Php74\rsort(): Incompatible compare detected in %s on line %d
-Incompatible compare detected
+Incompatible compare detected in %s on line %d
 
 Deprecated: Colopl\ColoplBc\Php74\rsort(): Incompatible compare detected in %s on line %d
-Incompatible compare detected
+Incompatible compare detected in %s on line %d
 
 Deprecated: Colopl\ColoplBc\Php74\rsort(): Incompatible compare detected in %s on line %d
-Incompatible compare detected
+Incompatible compare detected in %s on line %d
 
 Deprecated: Colopl\ColoplBc\Php74\rsort(): Incompatible compare detected in %s on line %d
-Incompatible compare detected
+Incompatible compare detected in %s on line %d
 
 Deprecated: Colopl\ColoplBc\Php74\rsort(): Incompatible compare detected in %s on line %d
-Incompatible compare detected
+Incompatible compare detected in %s on line %d
 
 Deprecated: Colopl\ColoplBc\Php74\rsort(): Incompatible compare detected in %s on line %d
-Incompatible compare detected
+Incompatible compare detected in %s on line %d
 
 Deprecated: Colopl\ColoplBc\Php74\rsort(): Incompatible compare detected in %s on line %d
-Incompatible compare detected
+Incompatible compare detected in %s on line %d
 
 Deprecated: Colopl\ColoplBc\Php74\rsort(): Incompatible compare detected in %s on line %d
-Incompatible compare detected
+Incompatible compare detected in %s on line %d
 
 Deprecated: Colopl\ColoplBc\Php74\rsort(): Incompatible compare detected in %s on line %d
-Incompatible compare detected
+Incompatible compare detected in %s on line %d
 
 Deprecated: Colopl\ColoplBc\Php74\rsort(): Incompatible compare detected in %s on line %d
-Incompatible compare detected
+Incompatible compare detected in %s on line %d
 
 Deprecated: Colopl\ColoplBc\Php74\rsort(): Incompatible compare detected in %s on line %d
-Incompatible compare detected
+Incompatible compare detected in %s on line %d
 
 Deprecated: Colopl\ColoplBc\Php74\rsort(): Incompatible compare detected in %s on line %d
-Incompatible compare detected
+Incompatible compare detected in %s on line %d
 
 Deprecated: Colopl\ColoplBc\Php74\rsort(): Incompatible compare detected in %s on line %d
-Incompatible compare detected
+Incompatible compare detected in %s on line %d
 
 Deprecated: Colopl\ColoplBc\Php74\rsort(): Incompatible compare detected in %s on line %d
-Incompatible compare detected
+Incompatible compare detected in %s on line %d
 
 Deprecated: Colopl\ColoplBc\Php74\rsort(): Incompatible compare detected in %s on line %d
-Incompatible compare detected
+Incompatible compare detected in %s on line %d
 
 Deprecated: Colopl\ColoplBc\Php74\rsort(): Incompatible compare detected in %s on line %d
-Incompatible compare detected
+Incompatible compare detected in %s on line %d
 
 Deprecated: Colopl\ColoplBc\Php74\rsort(): Incompatible compare detected in %s on line %d
-Incompatible compare detected
+Incompatible compare detected in %s on line %d
 
 Deprecated: Colopl\ColoplBc\Php74\rsort(): Incompatible compare detected in %s on line %d
-Incompatible compare detected
+Incompatible compare detected in %s on line %d
 
 Deprecated: Colopl\ColoplBc\Php74\rsort(): Incompatible compare detected in %s on line %d
-Incompatible compare detected
+Incompatible compare detected in %s on line %d
 
 Deprecated: Colopl\ColoplBc\Php74\rsort(): Incompatible compare detected in %s on line %d
-Incompatible compare detected
+Incompatible compare detected in %s on line %d
 
 Deprecated: Colopl\ColoplBc\Php74\rsort(): Incompatible compare detected in %s on line %d
-Incompatible compare detected
+Incompatible compare detected in %s on line %d
 
 Deprecated: Colopl\ColoplBc\Php74\rsort(): Incompatible compare detected in %s on line %d
-Incompatible compare detected
+Incompatible compare detected in %s on line %d
 
 Deprecated: Colopl\ColoplBc\Php74\rsort(): Incompatible compare detected in %s on line %d
-Incompatible compare detected
+Incompatible compare detected in %s on line %d
 
 Deprecated: Colopl\ColoplBc\Php74\rsort(): Incompatible compare detected in %s on line %d
-Incompatible compare detected
+Incompatible compare detected in %s on line %d
 
 Deprecated: Colopl\ColoplBc\Php74\rsort(): Incompatible compare detected in %s on line %d
-Incompatible compare detected
+Incompatible compare detected in %s on line %d
 
 Deprecated: Colopl\ColoplBc\Php74\rsort(): Incompatible compare detected in %s on line %d
-Incompatible compare detected
+Incompatible compare detected in %s on line %d
 
 Deprecated: Colopl\ColoplBc\Php74\rsort(): Incompatible compare detected in %s on line %d
-Incompatible compare detected
+Incompatible compare detected in %s on line %d
 
 Deprecated: Colopl\ColoplBc\Php74\rsort(): Incompatible compare detected in %s on line %d
-Incompatible compare detected
+Incompatible compare detected in %s on line %d
 
 Deprecated: Colopl\ColoplBc\Php74\rsort(): Incompatible compare detected in %s on line %d
-Incompatible compare detected
+Incompatible compare detected in %s on line %d
 
 Deprecated: Colopl\ColoplBc\Php74\rsort(): Incompatible compare detected in %s on line %d
-Incompatible compare detected
+Incompatible compare detected in %s on line %d
 
 Deprecated: Colopl\ColoplBc\Php74\rsort(): Incompatible compare detected in %s on line %d
-Incompatible compare detected
+Incompatible compare detected in %s on line %d
 
 Deprecated: Colopl\ColoplBc\Php74\rsort(): Incompatible compare detected in %s on line %d
-Incompatible compare detected
+Incompatible compare detected in %s on line %d
 
 Deprecated: Colopl\ColoplBc\Php74\rsort(): Incompatible compare detected in %s on line %d
-Incompatible compare detected
+Incompatible compare detected in %s on line %d
 
 Deprecated: Colopl\ColoplBc\Php74\rsort(): Incompatible compare detected in %s on line %d
-Incompatible compare detected
+Incompatible compare detected in %s on line %d
 
 Deprecated: Colopl\ColoplBc\Php74\rsort(): Incompatible compare detected in %s on line %d
-Incompatible compare detected
+Incompatible compare detected in %s on line %d
 
 Deprecated: Colopl\ColoplBc\Php74\rsort(): Incompatible compare detected in %s on line %d
-Incompatible compare detected
+Incompatible compare detected in %s on line %d
 
 Deprecated: Colopl\ColoplBc\Php74\rsort(): Incompatible compare detected in %s on line %d
-Incompatible compare detected
+Incompatible compare detected in %s on line %d
 
 Deprecated: Colopl\ColoplBc\Php74\rsort(): Incompatible compare detected in %s on line %d
-Incompatible compare detected
+Incompatible compare detected in %s on line %d
 
 Deprecated: Colopl\ColoplBc\Php74\rsort(): Incompatible compare detected in %s on line %d
-Incompatible compare detected
+Incompatible compare detected in %s on line %d
 
 Deprecated: Colopl\ColoplBc\Php74\rsort(): Incompatible compare detected in %s on line %d
-Incompatible compare detected
+Incompatible compare detected in %s on line %d
 
 Deprecated: Colopl\ColoplBc\Php74\rsort(): Incompatible compare detected in %s on line %d
-Incompatible compare detected
+Incompatible compare detected in %s on line %d
 
 Deprecated: Colopl\ColoplBc\Php74\rsort(): Incompatible compare detected in %s on line %d
-Incompatible compare detected
+Incompatible compare detected in %s on line %d
 
 Deprecated: Colopl\ColoplBc\Php74\rsort(): Incompatible compare detected in %s on line %d
-Incompatible compare detected
+Incompatible compare detected in %s on line %d
 
 Deprecated: Colopl\ColoplBc\Php74\rsort(): Incompatible compare detected in %s on line %d
-Incompatible compare detected
+Incompatible compare detected in %s on line %d
 
 Deprecated: Colopl\ColoplBc\Php74\rsort(): Incompatible compare detected in %s on line %d
-Incompatible compare detected
+Incompatible compare detected in %s on line %d
 
 Deprecated: Colopl\ColoplBc\Php74\rsort(): Incompatible compare detected in %s on line %d
-Incompatible compare detected
+Incompatible compare detected in %s on line %d
 
 Deprecated: Colopl\ColoplBc\Php74\rsort(): Incompatible compare detected in %s on line %d
-Incompatible compare detected
+Incompatible compare detected in %s on line %d
 
 Deprecated: Colopl\ColoplBc\Php74\rsort(): Incompatible compare detected in %s on line %d
-Incompatible compare detected
+Incompatible compare detected in %s on line %d
 
 Deprecated: Colopl\ColoplBc\Php74\rsort(): Incompatible compare detected in %s on line %d
-Incompatible compare detected
+Incompatible compare detected in %s on line %d
 
 Deprecated: Colopl\ColoplBc\Php74\rsort(): Incompatible compare detected in %s on line %d
-Incompatible compare detected
+Incompatible compare detected in %s on line %d
 
 Deprecated: Colopl\ColoplBc\Php74\rsort(): Incompatible compare detected in %s on line %d
-Incompatible compare detected
+Incompatible compare detected in %s on line %d
 
 Deprecated: Colopl\ColoplBc\Php74\rsort(): Incompatible compare detected in %s on line %d
-Incompatible sort detected
+Incompatible sort detected in %s on line %d
 
 Deprecated: Colopl\ColoplBc\Php74\rsort(): Incompatible sort detected in %s on line %d
 array(87) {

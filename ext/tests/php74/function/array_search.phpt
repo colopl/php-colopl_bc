@@ -16,7 +16,7 @@ if (!\Colopl\ColoplBc\Php74\array_search('', $array) === 'first') {
 die('Success.');
 ?>
 --EXPECTF--
-Incompatible compare detected
+Incompatible compare detected in %s on line %d
 
 Deprecated: Colopl\ColoplBc\Php74\array_search(): Incompatible compare detected in %s on line %d
 Success.

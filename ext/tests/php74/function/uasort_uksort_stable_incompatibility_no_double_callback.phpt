@@ -26,7 +26,7 @@ foreach (['uasort', 'uksort'] as $function) {
 }
 ?>
 --EXPECTF--
-Incompatible sort detected
+Incompatible sort detected in %s on line %d
 
 Deprecated: Colopl\ColoplBc\Php74\uasort(): Incompatible sort detected in %s on line %d
 uasort
@@ -55,7 +55,7 @@ array(5) {
   [4]=>
   int(38)
 }
-Incompatible sort detected
+Incompatible sort detected in %s on line %d
 
 Deprecated: Colopl\ColoplBc\Php74\uksort(): Incompatible sort detected in %s on line %d
 uksort

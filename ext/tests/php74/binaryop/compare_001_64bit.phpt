@@ -77,7 +77,7 @@ string(0) "" != array(3) {  [0]=>  int(1)  [1]=>  int(2)  [2]=>  int(3)}
 string(0) "" == string(0) ""
 string(0) "" != int(1)
 string(0) "" != float(2.5)
-string(0) ""Incompatible compare detected
+string(0) ""Incompatible compare detected in %s on line %d
 
 Deprecated: Colopl\ColoplBc\Php74\eq(): Incompatible compare detected in %s on line %d
  == int(0)
@@ -91,7 +91,7 @@ string(0) "" != object(stdClass)#%d (0) {}
 string(0) "" != object(stdClass)#%d (0) {}
 string(0) "" != object(test)#%d (0) {}
 string(0) "" != array(0) {}
-string(0) ""Incompatible compare detected
+string(0) ""Incompatible compare detected in %s on line %d
 
 Deprecated: Colopl\ColoplBc\Php74\eq(): Incompatible compare detected in %s on line %d
  != int(-9223372036854775808)
@@ -101,7 +101,7 @@ int(1) != string(0) ""
 int(1) == int(1)
 int(1) != float(2.5)
 int(1) != int(0)
-int(1)Incompatible compare detected
+int(1)Incompatible compare detected in %s on line %d
 
 Deprecated: Colopl\ColoplBc\Php74\eq(): Incompatible compare detected in %s on line %d
  != string(6) "string"
@@ -127,7 +127,7 @@ float(2.5) != string(0) ""
 float(2.5) != int(1)
 float(2.5) == float(2.5)
 float(2.5) != int(0)
-float(2.5)Incompatible compare detected
+float(2.5)Incompatible compare detected in %s on line %d
 
 Deprecated: Colopl\ColoplBc\Php74\eq(): Incompatible compare detected in %s on line %d
  != string(6) "string"
@@ -149,14 +149,14 @@ float(2.5) != array(0) {}
 float(2.5) != int(-9223372036854775808)
 float(2.5) != string(20) "-9223372036854775808"
 int(0) != array(3) {  [0]=>  int(1)  [1]=>  int(2)  [2]=>  int(3)}
-int(0)Incompatible compare detected
+int(0)Incompatible compare detected in %s on line %d
 
 Deprecated: Colopl\ColoplBc\Php74\eq(): Incompatible compare detected in %s on line %d
  == string(0) ""
 int(0) != int(1)
 int(0) != float(2.5)
 int(0) == int(0)
-int(0)Incompatible compare detected
+int(0)Incompatible compare detected in %s on line %d
 
 Deprecated: Colopl\ColoplBc\Php74\eq(): Incompatible compare detected in %s on line %d
  == string(6) "string"
@@ -179,15 +179,15 @@ int(0) != int(-9223372036854775808)
 int(0) != string(20) "-9223372036854775808"
 string(6) "string" != array(3) {  [0]=>  int(1)  [1]=>  int(2)  [2]=>  int(3)}
 string(6) "string" != string(0) ""
-string(6) "string"Incompatible compare detected
+string(6) "string"Incompatible compare detected in %s on line %d
 
 Deprecated: Colopl\ColoplBc\Php74\eq(): Incompatible compare detected in %s on line %d
  != int(1)
-string(6) "string"Incompatible compare detected
+string(6) "string"Incompatible compare detected in %s on line %d
 
 Deprecated: Colopl\ColoplBc\Php74\eq(): Incompatible compare detected in %s on line %d
  != float(2.5)
-string(6) "string"Incompatible compare detected
+string(6) "string"Incompatible compare detected in %s on line %d
 
 Deprecated: Colopl\ColoplBc\Php74\eq(): Incompatible compare detected in %s on line %d
  == int(0)
@@ -381,7 +381,7 @@ array(0) {} == array(0) {}
 array(0) {} != int(-9223372036854775808)
 array(0) {} != string(20) "-9223372036854775808"
 int(-9223372036854775808) != array(3) {  [0]=>  int(1)  [1]=>  int(2)  [2]=>  int(3)}
-int(-9223372036854775808)Incompatible compare detected
+int(-9223372036854775808)Incompatible compare detected in %s on line %d
 
 Deprecated: Colopl\ColoplBc\Php74\eq(): Incompatible compare detected in %s on line %d
  != string(0) ""

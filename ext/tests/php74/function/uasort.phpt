@@ -16,7 +16,7 @@ $array = range(1, 64);
 var_dump($array);
 ?>
 --EXPECTF--
-Incompatible sort detected
+Incompatible sort detected in %s on line %d
 
 Deprecated: Colopl\ColoplBc\Php74\uasort(): Incompatible sort detected in %s on line %d
 array(64) {

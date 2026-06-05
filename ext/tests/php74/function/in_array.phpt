@@ -16,7 +16,7 @@ if (!\Colopl\ColoplBc\Php74\in_array('', $array)) {
 die('Success.');
 ?>
 --EXPECTF--
-Incompatible compare detected
+Incompatible compare detected in %s on line %d
 
 Deprecated: Colopl\ColoplBc\Php74\in_array(): Incompatible compare detected in %s on line %d
 Success.

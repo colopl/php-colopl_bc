@@ -89,6 +89,23 @@ static inline bool php_colopl_bc_clear_diagnostic_exception(void)
 	return false;
 }
 
+static inline void php_colopl_bc_log_incompatibility(const char *message)
+{
+	const char *filename = zend_get_executed_filename();
+	uint32_t lineno = zend_get_executed_lineno();
+	char *log_message;
+
+	if (filename != NULL && filename[0] != '\0') {
+		spprintf(&log_message, 0, "%s in %s on line %u", message, filename, lineno);
+		php_log_err_with_severity(log_message, LOG_NOTICE);
+		efree(log_message);
+
+		return;
+	}
+
+	php_log_err_with_severity(message, LOG_NOTICE);
+}
+
 static inline bool php_colopl_bc_zval_contains_object(zval *op, HashTable *seen_arrays)
 {
 	zend_array *array;
@@ -865,7 +882,7 @@ static int legacy_compare_slow(zval *op1, zval *op2)
 
 	if (have_native_snapshot && !native_failed && native != bc) {
 		if (COLOPL_BC_G(php74_compare_mode) & COLOPL_BC_PHP74_COMPARE_MODE_LOG) {
-			php_log_err_with_severity("Incompatible compare detected", LOG_NOTICE);
+			php_colopl_bc_log_incompatibility("Incompatible compare detected");
 		}
 		if (COLOPL_BC_G(php74_compare_mode) & COLOPL_BC_PHP74_COMPARE_MODE_DEPRECATED) {
 			php_error_docref(NULL, E_DEPRECATED, "Incompatible compare detected");
@@ -1624,7 +1641,7 @@ static inline void php_colopl_bc_search_array(INTERNAL_FUNCTION_PARAMETERS, int 
 static inline void php_colopl_bc_report_incompatible_sort(void)
 {
 	if (COLOPL_BC_G(php74_sort_mode) & COLOPL_BC_PHP74_SORT_MODE_LOG) {
-		php_log_err_with_severity("Incompatible sort detected", LOG_NOTICE);
+		php_colopl_bc_log_incompatibility("Incompatible sort detected");
 	}
 
 	if (COLOPL_BC_G(php74_sort_mode) & COLOPL_BC_PHP74_SORT_MODE_DEPRECATED) {

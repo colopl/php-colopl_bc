@@ -18,7 +18,7 @@ ini_set('colopl_bc.php74.compare_mode', \COLOPL_BC_PHP74_COMPARE_MODE_DEPRECATED
 ?>
 --EXPECTF--
 Deprecated: Colopl\ColoplBc\Php74\eq(): Incompatible compare detected in %s on line %d
-Incompatible compare detected
-Incompatible compare detected
+Incompatible compare detected in %s on line %d
+Incompatible compare detected in %s on line %d
 
 Deprecated: Colopl\ColoplBc\Php74\eq(): Incompatible compare detected in %s on line %d

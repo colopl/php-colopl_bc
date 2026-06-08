@@ -26,6 +26,10 @@
 
 #define COLOPL_BC_TYPE_PAIR(t1,t2) (((t1) << 4) | (t2))
 
+#define COLOPL_BC_MULTISORT_ORDER	0
+#define COLOPL_BC_MULTISORT_TYPE	1
+#define COLOPL_BC_MULTISORT_LAST	2
+
 typedef struct _php_colopl_bc_snapshot_context {
 	HashTable arrays;
 	HashTable objects;
@@ -47,6 +51,8 @@ typedef struct _php_colopl_bc_user_sort_context {
 	uint32_t zero_pair_count;
 	uint32_t zero_pair_capacity;
 } php_colopl_bc_user_sort_context;
+
+static int legacy_compare_fast(zval *op1, zval *op2);
 
 static inline void php_colopl_bc_snapshot_context_init(php_colopl_bc_snapshot_context *ctx)
 {
@@ -251,6 +257,91 @@ static inline bool php_colopl_bc_zvals_contain_recursive_array(zval *op1, zval *
 	zend_hash_destroy(&seen_arrays);
 
 	return contains_recursive_array;
+}
+
+static inline bool php_colopl_bc_zval_is_snapshot_safe_object_property(zval *op)
+{
+	HashTable seen_arrays;
+	bool contains_object;
+
+	if (php_colopl_bc_zval_contains_recursive_array(op)) {
+		return false;
+	}
+
+	zend_hash_init(&seen_arrays, 8, NULL, NULL, 0);
+	contains_object = php_colopl_bc_zval_contains_object(op, &seen_arrays);
+	zend_hash_destroy(&seen_arrays);
+
+	return !contains_object;
+}
+
+static inline bool php_colopl_bc_object_is_snapshot_safe_for_native_compare(zend_object *object)
+{
+	zend_ulong num_key;
+	zend_string *str_key;
+	zval *entry, *prop;
+	uint32_t i;
+	ptrdiff_t offset;
+
+	if (object->handlers != &std_object_handlers) {
+		return false;
+	}
+
+	for (i = 0; i < object->ce->default_properties_count; i++) {
+		prop = object->properties_table + i;
+		if (Z_TYPE_P(prop) == IS_UNDEF) {
+			continue;
+		}
+		if (!php_colopl_bc_zval_is_snapshot_safe_object_property(prop)) {
+			return false;
+		}
+	}
+
+	if (object->properties == NULL || zend_hash_num_elements(object->properties) == 0) {
+		return true;
+	}
+
+	ZEND_HASH_FOREACH_KEY_VAL(object->properties, num_key, str_key, entry) {
+		if (Z_TYPE_P(entry) == IS_INDIRECT) {
+			offset = Z_INDIRECT_P(entry) - object->properties_table;
+			if (offset >= 0 && offset < object->ce->default_properties_count) {
+				continue;
+			}
+			entry = Z_INDIRECT_P(entry);
+		}
+
+		if (!php_colopl_bc_zval_is_snapshot_safe_object_property(entry)) {
+			return false;
+		}
+	} ZEND_HASH_FOREACH_END();
+
+	return true;
+}
+
+static inline bool php_colopl_bc_zvals_allow_native_compare_snapshot(zval *op1, zval *op2)
+{
+	ZVAL_DEREF(op1);
+	ZVAL_DEREF(op2);
+
+	if (Z_TYPE_P(op1) == IS_INDIRECT) {
+		op1 = Z_INDIRECT_P(op1);
+		ZVAL_DEREF(op1);
+	}
+
+	if (Z_TYPE_P(op2) == IS_INDIRECT) {
+		op2 = Z_INDIRECT_P(op2);
+		ZVAL_DEREF(op2);
+	}
++static int legacy_compare_fast(zval *op1, zval *op2);
+	if (Z_TYPE_P(op1) == IS_OBJECT || Z_TYPE_P(op2) == IS_OBJECT) {
+		return Z_TYPE_P(op1) == IS_OBJECT &&
+			Z_TYPE_P(op2) == IS_OBJECT &&
+			php_colopl_bc_object_is_snapshot_safe_for_native_compare(Z_OBJ_P(op1)) &&
+			php_colopl_bc_object_is_snapshot_safe_for_native_compare(Z_OBJ_P(op2))
+		;
+	}
+
+	return !php_colopl_bc_zvals_contain_object(op1, op2);
 }
 
 static inline bool php_colopl_bc_snapshot_zval(zval *dst, zval *src, php_colopl_bc_snapshot_context *ctx)
@@ -697,6 +788,88 @@ static inline void php_colopl_bc_convert_object_to_type(zval *op, zval *dst, uin
 	}
 }
 
+static int php_colopl_bc_legacy_compare_std_objects(zval *op1, zval *op2, bool *handled)
+{
+	zend_object *zobj1, *zobj2;
+	zend_property_info *info;
+	zval *p1, *p2;
+	int i, ret;
+
+	*handled = false;
+
+	if (Z_TYPE_P(op1) != IS_OBJECT || Z_TYPE_P(op2) != IS_OBJECT) {
+		return 1;
+	}
+
+	zobj1 = Z_OBJ_P(op1);
+	zobj2 = Z_OBJ_P(op2);
+
+	if (zobj1 == zobj2) {
+		*handled = true;
+		return 0;
+	}
+
+	if (zobj1->handlers != &std_object_handlers ||
+		zobj2->handlers != &std_object_handlers ||
+		zobj1->ce != zobj2->ce ||
+		zobj1->properties != NULL ||
+		zobj2->properties != NULL) {
+		return 1;
+	}
+
+	*handled = true;
+
+	if (!zobj1->ce->default_properties_count) {
+		return 0;
+	}
+
+	if (UNEXPECTED(Z_IS_RECURSIVE_P(op1))) {
+		zend_throw_error(NULL, "Nesting level too deep - recursive dependency?");
+		return ZEND_UNCOMPARABLE;
+	}
+
+	Z_PROTECT_RECURSION_P(op1);
+	GC_ADDREF(zobj1);
+	GC_ADDREF(zobj2);
+
+	for (i = 0; i < zobj1->ce->default_properties_count; i++) {
+		info = zobj1->ce->properties_info_table[i];
+		if (!info) {
+			continue;
+		}
+
+		p1 = OBJ_PROP(zobj1, info->offset);
+		p2 = OBJ_PROP(zobj2, info->offset);
+
+		if (Z_TYPE_P(p1) != IS_UNDEF) {
+			if (Z_TYPE_P(p2) != IS_UNDEF) {
+				ret = legacy_compare_fast(p1, p2);
+				if (ret != 0) {
+					Z_UNPROTECT_RECURSION_P(op1);
+					goto done;
+				}
+			} else {
+				Z_UNPROTECT_RECURSION_P(op1);
+				ret = 1;
+				goto done;
+			}
+		} else if (Z_TYPE_P(p2) != IS_UNDEF) {
+			Z_UNPROTECT_RECURSION_P(op1);
+			ret = 1;
+			goto done;
+		}
+	}
+
+	Z_UNPROTECT_RECURSION_P(op1);
+	ret = 0;
+
+done:
+	OBJ_RELEASE(zobj1);
+	OBJ_RELEASE(zobj2);
+
+	return ret;
+}
+
 static zend_never_inline zval* ZEND_FASTCALL _php_colopl_bc_zendi_convert_scalar_to_number_silent(zval *op, zval *holder)
 {
 	switch (Z_TYPE_P(op)) {
@@ -731,8 +904,9 @@ static zend_never_inline zval* ZEND_FASTCALL _php_colopl_bc_zendi_convert_scalar
 
 static int legacy_compare_fast(zval *op1, zval *op2)
 {
-	int converted = 0;
 	zval op1_copy, op2_copy;
+	bool handled;
+	int converted = 0, ret;
 
 	while (1) {
 		switch (COLOPL_BC_TYPE_PAIR(Z_TYPE_P(op1), Z_TYPE_P(op2))) {
@@ -784,6 +958,7 @@ static int legacy_compare_fast(zval *op1, zval *op2)
 				if (Z_STR_P(op1) == Z_STR_P(op2)) {
 					return 0;
 				}
+
 				return zendi_smart_strcmp(Z_STR_P(op1), Z_STR_P(op2));
 
 			case COLOPL_BC_TYPE_PAIR(IS_NULL, IS_STRING):
@@ -801,16 +976,27 @@ static int legacy_compare_fast(zval *op1, zval *op2)
 			default:
 				if (Z_ISREF_P(op1)) {
 					op1 = Z_REFVAL_P(op1);
+
 					continue;
 				} else if (Z_ISREF_P(op2)) {
 					op2 = Z_REFVAL_P(op2);
+
 					continue;
 				}
 
-				if (Z_TYPE_P(op1) == IS_OBJECT
-				 && Z_TYPE_P(op2) == IS_OBJECT
-				 && Z_OBJ_P(op1) == Z_OBJ_P(op2)) {
+				if (Z_TYPE_P(op1) == IS_OBJECT &&
+					Z_TYPE_P(op2) == IS_OBJECT &&
+					Z_OBJ_P(op1) == Z_OBJ_P(op2)
+				) {
 					return 0;
+				} else if (Z_TYPE_P(op1) == IS_OBJECT && Z_TYPE_P(op2) == IS_OBJECT) {
+					ret = php_colopl_bc_legacy_compare_std_objects(op1, op2, &handled);
+
+					if (handled) {
+						return ret;
+					}
+
+					return Z_OBJ_HANDLER_P(op1, compare)(op1, op2);
 				} else if (Z_TYPE_P(op1) == IS_OBJECT) {
 					return Z_OBJ_HANDLER_P(op1, compare)(op1, op2);
 				} else if (Z_TYPE_P(op2) == IS_OBJECT) {
@@ -829,9 +1015,11 @@ static int legacy_compare_fast(zval *op1, zval *op2)
 					} else {
 						op1 = _php_colopl_bc_zendi_convert_scalar_to_number_silent(op1, &op1_copy);
 						op2 = _php_colopl_bc_zendi_convert_scalar_to_number_silent(op2, &op2_copy);
+
 						if (EG(exception)) {
 							return 1; /* to stop comparison of arrays */
 						}
+
 						converted = 1;
 					}
 				} else if (Z_TYPE_P(op1)==IS_ARRAY) {
@@ -841,6 +1029,7 @@ static int legacy_compare_fast(zval *op1, zval *op2)
 				} else {
 					ZEND_UNREACHABLE();
 					zend_throw_error(NULL, "Unsupported operand types");
+
 					return 1;
 				}
 		}
@@ -862,7 +1051,7 @@ static int legacy_compare_slow(zval *op1, zval *op2)
 	ZVAL_UNDEF(&native_op1);
 	ZVAL_UNDEF(&native_op2);
 	php_colopl_bc_snapshot_context_init(&snapshot_context);
-	have_native_snapshot = !php_colopl_bc_zvals_contain_object(op1, op2) &&
+	have_native_snapshot = php_colopl_bc_zvals_allow_native_compare_snapshot(op1, op2) &&
 		!php_colopl_bc_zvals_contain_recursive_array(op1, op2) &&
 		php_colopl_bc_snapshot_zval(&native_op1, op1, &snapshot_context) &&
 		php_colopl_bc_snapshot_zval(&native_op2, op2, &snapshot_context)
@@ -884,6 +1073,7 @@ static int legacy_compare_slow(zval *op1, zval *op2)
 		if (COLOPL_BC_G(php74_compare_mode) & COLOPL_BC_PHP74_COMPARE_MODE_LOG) {
 			php_colopl_bc_log_incompatibility("Incompatible compare detected");
 		}
+
 		if (COLOPL_BC_G(php74_compare_mode) & COLOPL_BC_PHP74_COMPARE_MODE_DEPRECATED) {
 			php_error_docref(NULL, E_DEPRECATED, "Incompatible compare detected");
 		}
@@ -935,6 +1125,7 @@ static zend_always_inline bool php_colopl_bc_fast_equal_check_string(zval *op1, 
 	if (EXPECTED(Z_TYPE_P(op2) == IS_STRING)) {
 		return zend_fast_equal_strings(Z_STR_P(op1), Z_STR_P(op2));
 	}
+
 	return php_colopl_bc_compare(op1, op2) == 0;
 }
 
@@ -957,6 +1148,7 @@ static zend_always_inline bool php_colopl_bc_fast_equal_check_function(zval *op1
 			return zend_fast_equal_strings(Z_STR_P(op1), Z_STR_P(op2));
 		}
 	}
+
 	return php_colopl_bc_compare(op1, op2) == 0;
 }
 
@@ -1007,10 +1199,11 @@ static int php_colopl_bc_array_reverse_key_compare(Bucket *a, Bucket *b)
 
 static int php_colopl_bc_array_key_compare_numeric(Bucket *f, Bucket *s)
 {
+	double d1, d2;
+
 	if (f->key == NULL && s->key == NULL) {
 		return (zend_long)f->h > (zend_long)s->h ? 1 : -1;
 	} else {
-		double d1, d2;
 		if (f->key) {
 			d1 = zend_strtod(f->key->val, NULL);
 		} else {
@@ -1021,6 +1214,7 @@ static int php_colopl_bc_array_key_compare_numeric(Bucket *f, Bucket *s)
 		} else {
 			d2 = (double)(zend_long)s->h;
 		}
+
 		return ZEND_NORMALIZE_BOOL(d1 - d2);
 	}
 }
@@ -1034,8 +1228,7 @@ static int php_colopl_bc_array_key_compare_string_case(Bucket *f, Bucket *s)
 {
 	const char *s1, *s2;
 	size_t l1, l2;
-	char buf1[MAX_LENGTH_OF_LONG + 1];
-	char buf2[MAX_LENGTH_OF_LONG + 1];
+	char buf1[MAX_LENGTH_OF_LONG + 1], buf2[MAX_LENGTH_OF_LONG + 1];
 
 	if (f->key) {
 		s1 = f->key->val;
@@ -1044,6 +1237,7 @@ static int php_colopl_bc_array_key_compare_string_case(Bucket *f, Bucket *s)
 		s1 = zend_print_long_to_buf(buf1 + sizeof(buf1) - 1, f->h);
 		l1 = buf1 + sizeof(buf1) - 1 - s1;
 	}
+
 	if (s->key) {
 		s2 = s->key->val;
 		l2 = s->key->len;
@@ -1051,6 +1245,7 @@ static int php_colopl_bc_array_key_compare_string_case(Bucket *f, Bucket *s)
 		s2 = zend_print_long_to_buf(buf2 + sizeof(buf2) - 1, s->h);
 		l2 = buf2 + sizeof(buf2) - 1 - s1;
 	}
+
 	return zend_binary_strcasecmp_l(s1, l1, s2, l2);
 }
 
@@ -1063,8 +1258,7 @@ static int php_colopl_bc_array_key_compare_string(Bucket *f, Bucket *s)
 {
 	const char *s1, *s2;
 	size_t l1, l2;
-	char buf1[MAX_LENGTH_OF_LONG + 1];
-	char buf2[MAX_LENGTH_OF_LONG + 1];
+	char buf1[MAX_LENGTH_OF_LONG + 1], buf2[MAX_LENGTH_OF_LONG + 1];
 
 	if (f->key) {
 		s1 = f->key->val;
@@ -1073,6 +1267,7 @@ static int php_colopl_bc_array_key_compare_string(Bucket *f, Bucket *s)
 		s1 = zend_print_long_to_buf(buf1 + sizeof(buf1) - 1, f->h);
 		l1 = buf1 + sizeof(buf1) - 1 - s1;
 	}
+
 	if (s->key) {
 		s2 = s->key->val;
 		l2 = s->key->len;
@@ -1080,6 +1275,7 @@ static int php_colopl_bc_array_key_compare_string(Bucket *f, Bucket *s)
 		s2 = zend_print_long_to_buf(buf2 + sizeof(buf2) - 1, s->h);
 		l2 = buf2 + sizeof(buf2) - 1 - s2;
 	}
+
 	return zend_binary_strcmp(s1, l1, s2, l2);
 }
 
@@ -1092,8 +1288,7 @@ static int php_colopl_bc_array_key_compare_string_natural_general(Bucket *f, Buc
 {
 	const char *s1, *s2;
 	size_t l1, l2;
-	char buf1[MAX_LENGTH_OF_LONG + 1];
-	char buf2[MAX_LENGTH_OF_LONG + 1];
+	char buf1[MAX_LENGTH_OF_LONG + 1], buf2[MAX_LENGTH_OF_LONG + 1];
 
 	if (f->key) {
 		s1 = f->key->val;
@@ -1102,6 +1297,7 @@ static int php_colopl_bc_array_key_compare_string_natural_general(Bucket *f, Buc
 		s1 = zend_print_long_to_buf(buf1 + sizeof(buf1) - 1, f->h);
 		l1 = buf1 + sizeof(buf1) - 1 - s1;
 	}
+
 	if (s->key) {
 		s2 = s->key->val;
 		l2 = s->key->len;
@@ -1109,6 +1305,7 @@ static int php_colopl_bc_array_key_compare_string_natural_general(Bucket *f, Buc
 		s2 = zend_print_long_to_buf(buf2 + sizeof(buf2) - 1, s->h);
 		l2 = buf2 + sizeof(buf2) - 1 - s1;
 	}
+
 	return strnatcmp_ex(s1, l1, s2, l2, fold_case);
 }
 
@@ -1135,19 +1332,20 @@ static int php_colopl_bc_array_reverse_key_compare_string_natural(Bucket *a, Buc
 static int php_colopl_bc_array_key_compare_string_locale(Bucket *f, Bucket *s)
 {
 	const char *s1, *s2;
-	char buf1[MAX_LENGTH_OF_LONG + 1];
-	char buf2[MAX_LENGTH_OF_LONG + 1];
+	char buf1[MAX_LENGTH_OF_LONG + 1], buf2[MAX_LENGTH_OF_LONG + 1];
 
 	if (f->key) {
 		s1 = f->key->val;
 	} else {
 		s1 = zend_print_long_to_buf(buf1 + sizeof(buf1) - 1, f->h);
 	}
+
 	if (s->key) {
 		s2 = s->key->val;
 	} else {
 		s2 = zend_print_long_to_buf(buf2 + sizeof(buf2) - 1, s->h);
 	}
+
 	return strcoll(s1, s2);
 }
 
@@ -1158,12 +1356,12 @@ static int php_colopl_bc_array_reverse_key_compare_string_locale(Bucket *a, Buck
 
 static int php_colopl_bc_array_data_compare(Bucket *f, Bucket *s)
 {
-	zval *first = &f->val;
-	zval *second = &s->val;
+	zval *first = &f->val, *second = &s->val;
 
 	if (UNEXPECTED(Z_TYPE_P(first) == IS_INDIRECT)) {
 		first = Z_INDIRECT_P(first);
 	}
+
 	if (UNEXPECTED(Z_TYPE_P(second) == IS_INDIRECT)) {
 		second = Z_INDIRECT_P(second);
 	}
@@ -1178,12 +1376,12 @@ static int php_colopl_bc_array_reverse_data_compare(Bucket *a, Bucket *b)
 
 static int php_colopl_bc_array_data_compare_numeric(Bucket *f, Bucket *s)
 {
-	zval *first = &f->val;
-	zval *second = &s->val;
+	zval *first = &f->val, *second = &s->val;
 
 	if (UNEXPECTED(Z_TYPE_P(first) == IS_INDIRECT)) {
 		first = Z_INDIRECT_P(first);
 	}
+
 	if (UNEXPECTED(Z_TYPE_P(second) == IS_INDIRECT)) {
 		second = Z_INDIRECT_P(second);
 	}
@@ -1198,12 +1396,12 @@ static int php_colopl_bc_array_reverse_data_compare_numeric(Bucket *a, Bucket *b
 
 static int php_colopl_bc_array_data_compare_string_case(Bucket *f, Bucket *s)
 {
-	zval *first = &f->val;
-	zval *second = &s->val;
+	zval *first = &f->val, *second = &s->val;
 
 	if (UNEXPECTED(Z_TYPE_P(first) == IS_INDIRECT)) {
 		first = Z_INDIRECT_P(first);
 	}
+
 	if (UNEXPECTED(Z_TYPE_P(second) == IS_INDIRECT)) {
 		second = Z_INDIRECT_P(second);
 	}
@@ -1218,12 +1416,12 @@ static int php_colopl_bc_array_reverse_data_compare_string_case(Bucket *a, Bucke
 
 static int php_colopl_bc_array_data_compare_string(Bucket *f, Bucket *s)
 {
-	zval *first = &f->val;
-	zval *second = &s->val;
+	zval *first = &f->val, *second = &s->val;
 
 	if (UNEXPECTED(Z_TYPE_P(first) == IS_INDIRECT)) {
 		first = Z_INDIRECT_P(first);
 	}
+
 	if (UNEXPECTED(Z_TYPE_P(second) == IS_INDIRECT)) {
 		second = Z_INDIRECT_P(second);
 	}
@@ -1238,14 +1436,12 @@ static int php_colopl_bc_array_reverse_data_compare_string(Bucket *a, Bucket *b)
 
 static int php_colopl_bc_array_natural_general_compare(Bucket *f, Bucket *s, int fold_case)
 {
-	zend_string *tmp_str1, *tmp_str2;
-	zend_string *str1 = zval_get_tmp_string(&f->val, &tmp_str1);
-	zend_string *str2 = zval_get_tmp_string(&s->val, &tmp_str2);
-
+	zend_string *tmp_str1, *tmp_str2, *str1 = zval_get_tmp_string(&f->val, &tmp_str1), *str2 = zval_get_tmp_string(&s->val, &tmp_str2);
 	int result = strnatcmp_ex(ZSTR_VAL(str1), ZSTR_LEN(str1), ZSTR_VAL(str2), ZSTR_LEN(str2), fold_case);
 
 	zend_tmp_string_release(tmp_str1);
 	zend_tmp_string_release(tmp_str2);
+
 	return result;
 }
 
@@ -1271,12 +1467,12 @@ static int php_colopl_bc_array_reverse_natural_case_compare(Bucket *a, Bucket *b
 
 static int php_colopl_bc_array_data_compare_string_locale(Bucket *f, Bucket *s)
 {
-	zval *first = &f->val;
-	zval *second = &s->val;
+	zval *first = &f->val, *second = &s->val;
 
 	if (UNEXPECTED(Z_TYPE_P(first) == IS_INDIRECT)) {
 		first = Z_INDIRECT_P(first);
 	}
+
 	if (UNEXPECTED(Z_TYPE_P(second) == IS_INDIRECT)) {
 		second = Z_INDIRECT_P(second);
 	}
@@ -1308,6 +1504,7 @@ static int php_colopl_bc_array_user_compare(Bucket *f, Bucket *s)
 		zval_ptr_dtor(&retval);
 		zval_ptr_dtor(&args[1]);
 		zval_ptr_dtor(&args[0]);
+
 		if (result == 0) {
 			php_colopl_bc_user_sort_context_record_zero_pair(f, s);
 		}
@@ -1316,6 +1513,7 @@ static int php_colopl_bc_array_user_compare(Bucket *f, Bucket *s)
 	} else {
 		zval_ptr_dtor(&args[1]);
 		zval_ptr_dtor(&args[0]);
+
 		php_colopl_bc_user_sort_context_record_zero_pair(f, s);
 
 		result = 0;
@@ -1326,15 +1524,15 @@ static int php_colopl_bc_array_user_compare(Bucket *f, Bucket *s)
 
 static int php_colopl_bc_array_user_key_compare(Bucket *f, Bucket *s)
 {
-	zval args[2];
-	zval retval;
 	zend_long result;
+	zval args[2], retval;
 
 	if (f->key == NULL) {
 		ZVAL_LONG(&args[0], f->h);
 	} else {
 		ZVAL_STR_COPY(&args[0], f->key);
 	}
+
 	if (s->key == NULL) {
 		ZVAL_LONG(&args[1], s->h);
 	} else {
@@ -1344,8 +1542,10 @@ static int php_colopl_bc_array_user_key_compare(Bucket *f, Bucket *s)
 	COLOPL_BC_G(user_compare_fci).param_count = 2;
 	COLOPL_BC_G(user_compare_fci).params = args;
 	COLOPL_BC_G(user_compare_fci).retval = &retval;;
+
 	if (zend_call_function(&COLOPL_BC_G(user_compare_fci), &COLOPL_BC_G(user_compare_fci_cache)) == SUCCESS && Z_TYPE(retval) != IS_UNDEF) {
 		result = zval_get_long(&retval);
+
 		zval_ptr_dtor(&retval);
 	} else {
 		result = 0;
@@ -1371,8 +1571,8 @@ static bucket_compare_func_t php_colopl_bc_get_key_compare_func(zend_long sort_t
 			} else {
 				return php_colopl_bc_array_key_compare_numeric;
 			}
-			break;
 
+			break;
 		case PHP_SORT_STRING:
 			if (sort_type & PHP_SORT_FLAG_CASE) {
 				if (reverse) {
@@ -1387,8 +1587,8 @@ static bucket_compare_func_t php_colopl_bc_get_key_compare_func(zend_long sort_t
 					return php_colopl_bc_array_key_compare_string;
 				}
 			}
-			break;
 
+			break;
 		case PHP_SORT_NATURAL:
 			if (sort_type & PHP_SORT_FLAG_CASE) {
 				if (reverse) {
@@ -1403,16 +1603,16 @@ static bucket_compare_func_t php_colopl_bc_get_key_compare_func(zend_long sort_t
 					return php_colopl_bc_array_key_compare_string_natural;
 				}
 			}
-			break;
 
+			break;
 		case PHP_SORT_LOCALE_STRING:
 			if (reverse) {
 				return php_colopl_bc_array_reverse_key_compare_string_locale;
 			} else {
 				return php_colopl_bc_array_key_compare_string_locale;
 			}
-			break;
 
+			break;
 		case PHP_SORT_REGULAR:
 		default:
 			if (reverse) {
@@ -1420,8 +1620,10 @@ static bucket_compare_func_t php_colopl_bc_get_key_compare_func(zend_long sort_t
 			} else {
 				return php_colopl_bc_array_key_compare;
 			}
+
 			break;
 	}
+
 	return NULL;
 }
 
@@ -1434,8 +1636,8 @@ static bucket_compare_func_t php_colopl_bc_get_data_compare_func(zend_long sort_
 			} else {
 				return php_colopl_bc_array_data_compare_numeric;
 			}
-			break;
 
+			break;
 		case PHP_SORT_STRING:
 			if (sort_type & PHP_SORT_FLAG_CASE) {
 				if (reverse) {
@@ -1450,8 +1652,8 @@ static bucket_compare_func_t php_colopl_bc_get_data_compare_func(zend_long sort_
 					return php_colopl_bc_array_data_compare_string;
 				}
 			}
-			break;
 
+			break;
 		case PHP_SORT_NATURAL:
 			if (sort_type & PHP_SORT_FLAG_CASE) {
 				if (reverse) {
@@ -1466,16 +1668,16 @@ static bucket_compare_func_t php_colopl_bc_get_data_compare_func(zend_long sort_
 					return php_colopl_bc_array_natural_compare;
 				}
 			}
-			break;
 
+			break;
 		case PHP_SORT_LOCALE_STRING:
 			if (reverse) {
 				return php_colopl_bc_array_reverse_data_compare_string_locale;
 			} else {
 				return php_colopl_bc_array_data_compare_string_locale;
 			}
-			break;
 
+			break;
 		case PHP_SORT_REGULAR:
 		default:
 			if (reverse) {
@@ -1483,14 +1685,12 @@ static bucket_compare_func_t php_colopl_bc_get_data_compare_func(zend_long sort_
 			} else {
 				return php_colopl_bc_array_data_compare;
 			}
+
 			break;
 	}
+
 	return NULL;
 }
-
-#define COLOPL_BC_MULTISORT_ORDER	0
-#define COLOPL_BC_MULTISORT_TYPE	1
-#define COLOPL_BC_MULTISORT_LAST	2
 
 int php_colopl_bc_multisort_compare(const void *a, const void *b)
 {

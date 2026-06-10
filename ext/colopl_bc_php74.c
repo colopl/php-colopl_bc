@@ -1541,7 +1541,7 @@ static int php_colopl_bc_array_user_key_compare(Bucket *f, Bucket *s)
 
 	COLOPL_BC_G(user_compare_fci).param_count = 2;
 	COLOPL_BC_G(user_compare_fci).params = args;
-	COLOPL_BC_G(user_compare_fci).retval = &retval;;
+	COLOPL_BC_G(user_compare_fci).retval = &retval;
 
 	if (zend_call_function(&COLOPL_BC_G(user_compare_fci), &COLOPL_BC_G(user_compare_fci_cache)) == SUCCESS && Z_TYPE(retval) != IS_UNDEF) {
 		result = zval_get_long(&retval);

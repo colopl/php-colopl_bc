@@ -332,7 +332,6 @@ static inline bool php_colopl_bc_zvals_allow_native_compare_snapshot(zval *op1, 
 		op2 = Z_INDIRECT_P(op2);
 		ZVAL_DEREF(op2);
 	}
-+static int legacy_compare_fast(zval *op1, zval *op2);
 	if (Z_TYPE_P(op1) == IS_OBJECT || Z_TYPE_P(op2) == IS_OBJECT) {
 		return Z_TYPE_P(op1) == IS_OBJECT &&
 			Z_TYPE_P(op2) == IS_OBJECT &&

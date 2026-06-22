@@ -1,53 +1,50 @@
 /* This is a generated file, edit the .stub.php file instead.
  * Stub hash: c33b258c86782e7f6799e12286c59e9cc2e8319a */
 
-ZEND_BEGIN_ARG_WITH_RETURN_TYPE_INFO_EX(arginfo_Colopl_ColoplBc_Php70_srand, 0, 0, IS_VOID, 0)
-	ZEND_ARG_TYPE_INFO_WITH_DEFAULT_VALUE(0, seed, IS_LONG, 0, "0")
+ZEND_BEGIN_ARG_INFO_EX(arginfo_Colopl_ColoplBc_Php70_srand, 0, 0, 0)
+	ZEND_ARG_INFO(0, seed)
 ZEND_END_ARG_INFO()
 
-ZEND_BEGIN_ARG_WITH_RETURN_TYPE_INFO_EX(arginfo_Colopl_ColoplBc_Php70_rand, 0, 0, IS_LONG, 0)
-	ZEND_ARG_TYPE_INFO(0, seed, IS_LONG, 0)
-	ZEND_ARG_TYPE_INFO(0, max, IS_LONG, 0)
+ZEND_BEGIN_ARG_INFO_EX(arginfo_Colopl_ColoplBc_Php70_rand, 0, 0, 0)
+	ZEND_ARG_INFO(0, seed)
+	ZEND_ARG_INFO(0, max)
 ZEND_END_ARG_INFO()
 
-ZEND_BEGIN_ARG_WITH_RETURN_TYPE_INFO_EX(arginfo_Colopl_ColoplBc_Php70_getrandmax, 0, 0, IS_LONG, 0)
+ZEND_BEGIN_ARG_INFO_EX(arginfo_Colopl_ColoplBc_Php70_getrandmax, 0, 0, 0)
 ZEND_END_ARG_INFO()
 
-ZEND_BEGIN_ARG_WITH_RETURN_TYPE_INFO_EX(arginfo_Colopl_ColoplBc_Php70_shuffle, 0, 1, _IS_BOOL, 0)
-	ZEND_ARG_TYPE_INFO(1, array, IS_ARRAY, 0)
+ZEND_BEGIN_ARG_INFO_EX(arginfo_Colopl_ColoplBc_Php70_shuffle, 0, 0, 1)
+	ZEND_ARG_INFO(1, array)
 ZEND_END_ARG_INFO()
 
-ZEND_BEGIN_ARG_WITH_RETURN_TYPE_INFO_EX(arginfo_Colopl_ColoplBc_Php70_str_shuffle, 0, 1, IS_STRING, 0)
-	ZEND_ARG_TYPE_INFO(0, string, IS_STRING, 0)
+ZEND_BEGIN_ARG_INFO_EX(arginfo_Colopl_ColoplBc_Php70_str_shuffle, 0, 0, 1)
+	ZEND_ARG_INFO(0, string)
 ZEND_END_ARG_INFO()
 
-ZEND_BEGIN_ARG_WITH_RETURN_TYPE_MASK_EX(arginfo_Colopl_ColoplBc_Php70_array_rand, 0, 1, MAY_BE_LONG|MAY_BE_STRING|MAY_BE_ARRAY)
-	ZEND_ARG_TYPE_INFO(0, array, IS_ARRAY, 0)
-	ZEND_ARG_TYPE_INFO_WITH_DEFAULT_VALUE(0, num, IS_LONG, 0, "1")
+ZEND_BEGIN_ARG_INFO_EX(arginfo_Colopl_ColoplBc_Php70_array_rand, 0, 0, 1)
+	ZEND_ARG_INFO(0, array)
+	ZEND_ARG_INFO(0, num)
 ZEND_END_ARG_INFO()
 
 #define arginfo_Colopl_ColoplBc_Php70_mt_srand arginfo_Colopl_ColoplBc_Php70_srand
 
-ZEND_BEGIN_ARG_WITH_RETURN_TYPE_INFO_EX(arginfo_Colopl_ColoplBc_Php70_mt_rand, 0, 0, IS_LONG, 0)
-	ZEND_ARG_TYPE_INFO(0, min, IS_LONG, 0)
-	ZEND_ARG_TYPE_INFO(0, max, IS_LONG, 0)
+ZEND_BEGIN_ARG_INFO_EX(arginfo_Colopl_ColoplBc_Php70_mt_rand, 0, 0, 0)
+	ZEND_ARG_INFO(0, min)
+	ZEND_ARG_INFO(0, max)
 ZEND_END_ARG_INFO()
 
 #define arginfo_Colopl_ColoplBc_Php70_mt_getrandmax arginfo_Colopl_ColoplBc_Php70_getrandmax
 
-ZEND_BEGIN_ARG_WITH_RETURN_OBJ_TYPE_MASK_EX(arginfo_Colopl_ColoplBc_Php70_date_create, 0, 0, DateTime, MAY_BE_FALSE)
-	ZEND_ARG_TYPE_INFO_WITH_DEFAULT_VALUE(0, datetime, IS_STRING, 0, "\'now\'")
-	ZEND_ARG_OBJ_INFO_WITH_DEFAULT_VALUE(0, timezone, DateTimeZone, 1, "null")
+ZEND_BEGIN_ARG_INFO_EX(arginfo_Colopl_ColoplBc_Php70_date_create, 0, 0, 0)
+	ZEND_ARG_INFO(0, datetime)
+	ZEND_ARG_INFO(0, timezone)
 ZEND_END_ARG_INFO()
 
-ZEND_BEGIN_ARG_WITH_RETURN_OBJ_TYPE_MASK_EX(arginfo_Colopl_ColoplBc_Php70_date_create_immutable, 0, 0, DateTimeImmutable, MAY_BE_FALSE)
-	ZEND_ARG_TYPE_INFO_WITH_DEFAULT_VALUE(0, datetime, IS_STRING, 0, "\'now\'")
-	ZEND_ARG_OBJ_INFO_WITH_DEFAULT_VALUE(0, timezone, DateTimeZone, 1, "null")
-ZEND_END_ARG_INFO()
+#define arginfo_Colopl_ColoplBc_Php70_date_create_immutable arginfo_Colopl_ColoplBc_Php70_date_create
 
-ZEND_BEGIN_ARG_WITH_RETURN_TYPE_INFO_EX(arginfo_Colopl_ColoplBc_Php74_ksort, 0, 1, _IS_BOOL, 0)
-	ZEND_ARG_TYPE_INFO(1, array, IS_ARRAY, 0)
-	ZEND_ARG_TYPE_INFO_WITH_DEFAULT_VALUE(0, flags, IS_LONG, 0, "SORT_REGULAR")
+ZEND_BEGIN_ARG_INFO_EX(arginfo_Colopl_ColoplBc_Php74_ksort, 0, 0, 1)
+	ZEND_ARG_INFO(1, array)
+	ZEND_ARG_INFO(0, flags)
 ZEND_END_ARG_INFO()
 
 #define arginfo_Colopl_ColoplBc_Php74_krsort arginfo_Colopl_ColoplBc_Php74_ksort
@@ -60,41 +57,37 @@ ZEND_END_ARG_INFO()
 
 #define arginfo_Colopl_ColoplBc_Php74_rsort arginfo_Colopl_ColoplBc_Php74_ksort
 
-ZEND_BEGIN_ARG_WITH_RETURN_TYPE_INFO_EX(arginfo_Colopl_ColoplBc_Php74_usort, 0, 2, _IS_BOOL, 0)
-	ZEND_ARG_TYPE_INFO(1, array, IS_ARRAY, 0)
-	ZEND_ARG_TYPE_INFO(0, callback, IS_CALLABLE, 0)
+ZEND_BEGIN_ARG_INFO_EX(arginfo_Colopl_ColoplBc_Php74_usort, 0, 0, 2)
+	ZEND_ARG_INFO(1, array)
+	ZEND_ARG_INFO(0, callback)
 ZEND_END_ARG_INFO()
 
 #define arginfo_Colopl_ColoplBc_Php74_uasort arginfo_Colopl_ColoplBc_Php74_usort
 
 #define arginfo_Colopl_ColoplBc_Php74_uksort arginfo_Colopl_ColoplBc_Php74_usort
 
-ZEND_BEGIN_ARG_WITH_RETURN_TYPE_INFO_EX(arginfo_Colopl_ColoplBc_Php74_in_array, 0, 2, _IS_BOOL, 0)
-	ZEND_ARG_TYPE_INFO(0, needle, IS_MIXED, 0)
-	ZEND_ARG_TYPE_INFO(0, haystack, IS_ARRAY, 0)
-	ZEND_ARG_TYPE_INFO_WITH_DEFAULT_VALUE(0, strict, _IS_BOOL, 0, "false")
+ZEND_BEGIN_ARG_INFO_EX(arginfo_Colopl_ColoplBc_Php74_in_array, 0, 0, 2)
+	ZEND_ARG_INFO(0, needle)
+	ZEND_ARG_INFO(0, haystack)
+	ZEND_ARG_INFO(0, strict)
 ZEND_END_ARG_INFO()
 
-ZEND_BEGIN_ARG_WITH_RETURN_TYPE_MASK_EX(arginfo_Colopl_ColoplBc_Php74_array_search, 0, 2, MAY_BE_LONG|MAY_BE_STRING|MAY_BE_FALSE)
-	ZEND_ARG_TYPE_INFO(0, needle, IS_MIXED, 0)
-	ZEND_ARG_TYPE_INFO(0, haystack, IS_ARRAY, 0)
-	ZEND_ARG_TYPE_INFO_WITH_DEFAULT_VALUE(0, strict, _IS_BOOL, 0, "false")
+#define arginfo_Colopl_ColoplBc_Php74_array_search arginfo_Colopl_ColoplBc_Php74_in_array
+
+ZEND_BEGIN_ARG_INFO_EX(arginfo_Colopl_ColoplBc_Php74_array_keys, 0, 0, 1)
+	ZEND_ARG_INFO(0, array)
+	ZEND_ARG_INFO(0, filter_value)
+	ZEND_ARG_INFO(0, strict)
 ZEND_END_ARG_INFO()
 
-ZEND_BEGIN_ARG_WITH_RETURN_TYPE_INFO_EX(arginfo_Colopl_ColoplBc_Php74_array_keys, 0, 1, IS_ARRAY, 0)
-	ZEND_ARG_TYPE_INFO(0, array, IS_ARRAY, 0)
-	ZEND_ARG_TYPE_INFO(0, filter_value, IS_MIXED, 0)
-	ZEND_ARG_TYPE_INFO_WITH_DEFAULT_VALUE(0, strict, _IS_BOOL, 0, "false")
-ZEND_END_ARG_INFO()
-
-ZEND_BEGIN_ARG_WITH_RETURN_TYPE_INFO_EX(arginfo_Colopl_ColoplBc_Php74_array_multisort, 0, 1, _IS_BOOL, 0)
+ZEND_BEGIN_ARG_INFO_EX(arginfo_Colopl_ColoplBc_Php74_array_multisort, 0, 0, 1)
 	ZEND_ARG_INFO(ZEND_SEND_PREFER_REF, array)
 	ZEND_ARG_VARIADIC_INFO(ZEND_SEND_PREFER_REF, rest)
 ZEND_END_ARG_INFO()
 
-ZEND_BEGIN_ARG_WITH_RETURN_TYPE_INFO_EX(arginfo_Colopl_ColoplBc_Php74_eq, 0, 2, _IS_BOOL, 0)
-	ZEND_ARG_TYPE_INFO(0, op1, IS_MIXED, 0)
-	ZEND_ARG_TYPE_INFO(0, op2, IS_MIXED, 0)
+ZEND_BEGIN_ARG_INFO_EX(arginfo_Colopl_ColoplBc_Php74_eq, 0, 0, 2)
+	ZEND_ARG_INFO(0, op1)
+	ZEND_ARG_INFO(0, op2)
 ZEND_END_ARG_INFO()
 
 #define arginfo_Colopl_ColoplBc_Php74_neq arginfo_Colopl_ColoplBc_Php74_eq
@@ -107,10 +100,7 @@ ZEND_END_ARG_INFO()
 
 #define arginfo_Colopl_ColoplBc_Php74_gte arginfo_Colopl_ColoplBc_Php74_eq
 
-ZEND_BEGIN_ARG_WITH_RETURN_TYPE_INFO_EX(arginfo_Colopl_ColoplBc_Php74_spaceship, 0, 2, IS_LONG, 0)
-	ZEND_ARG_TYPE_INFO(0, op1, IS_MIXED, 0)
-	ZEND_ARG_TYPE_INFO(0, op2, IS_MIXED, 0)
-ZEND_END_ARG_INFO()
+#define arginfo_Colopl_ColoplBc_Php74_spaceship arginfo_Colopl_ColoplBc_Php74_eq
 
 ZEND_FUNCTION(Colopl_ColoplBc_Php70_srand);
 ZEND_FUNCTION(Colopl_ColoplBc_Php70_rand);

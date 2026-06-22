@@ -6,6 +6,8 @@ colopl_bc
 date.timezone=UTC
 error_log=
 colopl_bc.php74.compare_mode=1
+--SKIPIF--
+<?php if (PHP_VERSION_ID < 80000) die("skip PHP 8 compatibility diagnostics only"); ?>
 --FILE--
 <?php
 class Box {

@@ -8,7 +8,7 @@ error_log=
 colopl_bc.php74.compare_mode=3
 colopl_bc.php74.sort_mode=3
 --SKIPIF--
-<?php if (PHP_INT_SIZE != 8) die("skip this test is for 64bit platform only"); ?>
+<?php if (PHP_VERSION_ID < 80000) die("skip PHP 8 compatibility diagnostics only"); if (PHP_INT_SIZE != 8) die("skip this test is for 64bit platform only"); ?>
 --FILE--
 <?php
 

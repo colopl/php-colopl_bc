@@ -1,26 +1,9 @@
 {
     "name": "colopl/colopl_bc",
-    "description": "PHP Backwards compatibility library.",
+    "description": "PHP backwards compatibility extension.",
     "type": "php-ext",
-    "autoload": {
-        "psr-4": {
-            "Colopl\\ColoplBc\\": "src/"
-        },
-        "files": ["library.php"]
-    },
-    "autoload-dev": {
-        "psr-4": {
-            "Colopl\\ColoplBc\\Tests\\": "tests/"
-        }
-    },
     "require": {
         "php": "~7.4.0 || ~8.1.0 || ~8.2.0 || ~8.3.0 || ~8.4.1 || ~8.5.0"
-    },
-    "require-dev": {
-        "phpstan/phpstan": "^2.1.32",
-        "phpunit/phpunit": "^10 || ^11 || ^12.4.5 || ^13.0.0",
-        "phpstan/phpstan-phpunit": "^2.0.8",
-        "rector/rector": "^2.2.11"
     },
     "replace": {
         "ext-colopl_bc": "*"
@@ -42,11 +25,5 @@
             "name": "Go Kudo",
             "email": "g-kudo@colopl.co.jp"
         }
-    ],
-    "minimum-stability": "stable",
-    "config": {
-        "allow-plugins": {
-            "rector/extension-installer": true
-        }
-    }
+    ]
 }

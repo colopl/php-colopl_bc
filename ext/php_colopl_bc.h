@@ -14,6 +14,9 @@
 #ifndef PHP_COLOPL_BC_H
 #define PHP_COLOPL_BC_H
 
+#include <stdarg.h>
+#include <stdbool.h>
+
 #include "php.h"
 
 #if PHP_VERSION_ID < 80400
@@ -38,6 +41,31 @@ extern zend_module_entry colopl_bc_module_entry;
 
 #define PHP_COLOPL_BC_VERSION "13.1.1"
 
+#if PHP_VERSION_ID < 80000
+# ifndef RETURN_THROWS
+#  define RETURN_THROWS() return
+# endif
+
+# ifndef Z_PARAM_OBJECT_OF_CLASS_OR_NULL
+#  define Z_PARAM_OBJECT_OF_CLASS_OR_NULL(dest, ce) Z_PARAM_OBJECT_OF_CLASS_EX(dest, ce, 1, 0)
+# endif
+
+static inline void php_colopl_bc_argument_value_error(uint32_t arg_num, const char *format, ...)
+{
+	char *message;
+	va_list args;
+
+	va_start(args, format);
+	vspprintf(&message, 0, format, args);
+	va_end(args);
+
+	php_error_docref(NULL, E_WARNING, "Argument #%u %s", arg_num, message);
+	efree(message);
+}
+
+# define zend_argument_value_error php_colopl_bc_argument_value_error
+#endif
+
 enum {
 	COLOPL_BC_MT_N = 624,
 	COLOPL_BC_MT_STATE_SIZE = COLOPL_BC_MT_N + 1
@@ -52,14 +80,18 @@ ZEND_BEGIN_MODULE_GLOBALS(colopl_bc)
 	int mt_left;
 	int gnurandom_r[344];
 	int gnurandom_next;
+#if PHP_VERSION_ID >= 80000
 	bucket_compare_func_t *multisort_func;
+#endif
 	zend_fcall_info user_compare_fci;
 	zend_fcall_info_cache user_compare_fci_cache;
 	zend_long php74_compare_mode;
 	int (*php74_compare_func)(zval *op1, zval *op2);
 	zend_long php74_sort_mode;
+#if PHP_VERSION_ID >= 80000
 	void (*php74_hash_sort_func)(INTERNAL_FUNCTION_PARAMETERS, zval *array, bucket_compare_func_t compare_func, bool renumber, bool compare_func_may_call_user_code);
 	void *php74_user_sort_context;
+#endif
 ZEND_END_MODULE_GLOBALS(colopl_bc)
 
 ZEND_EXTERN_MODULE_GLOBALS(colopl_bc)

@@ -5,6 +5,8 @@ colopl_bc
 --INI--
 date.timezone=UTC
 error_log=
+--SKIPIF--
+<?php if (PHP_VERSION_ID < 80000) die("skip PHP 8 compatibility diagnostics only"); ?>
 --FILE--
 <?php
 error_reporting(E_ALL);

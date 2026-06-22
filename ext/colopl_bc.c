@@ -20,7 +20,11 @@
 #include "ext/standard/info.h"
 
 #include "php_colopl_bc.h"
-#include "colopl_bc_arginfo.h"
+#if PHP_VERSION_ID < 80000
+# include "colopl_bc_legacy_arginfo.h"
+#else
+# include "colopl_bc_arginfo.h"
+#endif
 
 ZEND_DECLARE_MODULE_GLOBALS(colopl_bc);
 
@@ -70,7 +74,9 @@ PHP_GINIT_FUNCTION(colopl_bc)
 	ZEND_TSRMLS_CACHE_UPDATE();
 #endif
 
+#if PHP_VERSION_ID >= 80000
 	colopl_bc_globals->php74_user_sort_context = NULL;
+#endif
 }
 
 zend_module_entry colopl_bc_module_entry = {

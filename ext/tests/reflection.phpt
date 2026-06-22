@@ -4,6 +4,8 @@ Check for colopl_bc functions reflection information.
 colopl_bc
 --INI--
 date.timezone=UTC
+--SKIPIF--
+<?php if (PHP_VERSION_ID < 80000) die("skip PHP 8 reflection metadata only"); ?>
 --FILE--
 <?php
 foreach ((new ReflectionExtension('colopl_bc'))->getFunctions() as $function) { echo $function; }

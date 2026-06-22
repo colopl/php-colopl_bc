@@ -15,12 +15,213 @@
 # include "config.h"
 #endif
 
+#include <string.h>
+
 #include "php_colopl_bc.h"
 
 #include "ext/standard/php_array.h"
 #include "ext/standard/php_string.h"
 #include "zend_exceptions.h"
 #include "zend_operators.h"
+
+#if PHP_VERSION_ID < 80000
+
+static void php_colopl_bc_call_native_function(INTERNAL_FUNCTION_PARAMETERS)
+{
+	zend_internal_function *fn;
+	zend_string *function_name = execute_data->func->common.function_name;
+	const char *native_name = ZSTR_VAL(function_name);
+	const char *namespace_separator = strrchr(native_name, '\\');
+
+	if (namespace_separator != NULL) {
+		native_name = namespace_separator + 1;
+	}
+
+	fn = zend_hash_str_find_ptr(EG(function_table), native_name, strlen(native_name));
+	if (UNEXPECTED(fn == NULL)) {
+		zend_throw_error(NULL, "Internal function %s() is not available", native_name);
+		return;
+	}
+
+	fn->handler(INTERNAL_FUNCTION_PARAM_PASSTHRU);
+}
+
+static inline int php_colopl_bc_normalize_compare_result(int result)
+{
+	return result > 0 ? 1 : (result < 0 ? -1 : 0);
+}
+
+PHP_INI_MH(OnUpdateCompareMode)
+{
+	return OnUpdateLong(entry, new_value, mh_arg1, mh_arg2, mh_arg3, stage);
+}
+
+PHP_INI_MH(OnUpdateSortMode)
+{
+	return OnUpdateLong(entry, new_value, mh_arg1, mh_arg2, mh_arg3, stage);
+}
+
+int php_colopl_bc_compare(zval *op1, zval *op2)
+{
+	zval result;
+
+	if (compare_function(&result, op1, op2) == FAILURE) {
+		return 0;
+	}
+
+	return php_colopl_bc_normalize_compare_result(Z_LVAL(result));
+}
+
+PHP_FUNCTION(Colopl_ColoplBc_Php74_ksort)
+{
+	php_colopl_bc_call_native_function(INTERNAL_FUNCTION_PARAM_PASSTHRU);
+}
+
+PHP_FUNCTION(Colopl_ColoplBc_Php74_krsort)
+{
+	php_colopl_bc_call_native_function(INTERNAL_FUNCTION_PARAM_PASSTHRU);
+}
+
+PHP_FUNCTION(Colopl_ColoplBc_Php74_asort)
+{
+	php_colopl_bc_call_native_function(INTERNAL_FUNCTION_PARAM_PASSTHRU);
+}
+
+PHP_FUNCTION(Colopl_ColoplBc_Php74_arsort)
+{
+	php_colopl_bc_call_native_function(INTERNAL_FUNCTION_PARAM_PASSTHRU);
+}
+
+PHP_FUNCTION(Colopl_ColoplBc_Php74_sort)
+{
+	php_colopl_bc_call_native_function(INTERNAL_FUNCTION_PARAM_PASSTHRU);
+}
+
+PHP_FUNCTION(Colopl_ColoplBc_Php74_rsort)
+{
+	php_colopl_bc_call_native_function(INTERNAL_FUNCTION_PARAM_PASSTHRU);
+}
+
+PHP_FUNCTION(Colopl_ColoplBc_Php74_usort)
+{
+	php_colopl_bc_call_native_function(INTERNAL_FUNCTION_PARAM_PASSTHRU);
+}
+
+PHP_FUNCTION(Colopl_ColoplBc_Php74_uasort)
+{
+	php_colopl_bc_call_native_function(INTERNAL_FUNCTION_PARAM_PASSTHRU);
+}
+
+PHP_FUNCTION(Colopl_ColoplBc_Php74_uksort)
+{
+	php_colopl_bc_call_native_function(INTERNAL_FUNCTION_PARAM_PASSTHRU);
+}
+
+PHP_FUNCTION(Colopl_ColoplBc_Php74_in_array)
+{
+	php_colopl_bc_call_native_function(INTERNAL_FUNCTION_PARAM_PASSTHRU);
+}
+
+PHP_FUNCTION(Colopl_ColoplBc_Php74_array_search)
+{
+	php_colopl_bc_call_native_function(INTERNAL_FUNCTION_PARAM_PASSTHRU);
+}
+
+PHP_FUNCTION(Colopl_ColoplBc_Php74_array_keys)
+{
+	php_colopl_bc_call_native_function(INTERNAL_FUNCTION_PARAM_PASSTHRU);
+}
+
+PHP_FUNCTION(Colopl_ColoplBc_Php74_array_multisort)
+{
+	php_colopl_bc_call_native_function(INTERNAL_FUNCTION_PARAM_PASSTHRU);
+}
+
+PHP_FUNCTION(Colopl_ColoplBc_Php74_eq)
+{
+	zval *op1, *op2;
+
+	ZEND_PARSE_PARAMETERS_START(2, 2)
+		Z_PARAM_ZVAL(op1)
+		Z_PARAM_ZVAL(op2)
+	ZEND_PARSE_PARAMETERS_END();
+
+	RETURN_BOOL(php_colopl_bc_compare(op1, op2) == 0);
+}
+
+PHP_FUNCTION(Colopl_ColoplBc_Php74_neq)
+{
+	zval *op1, *op2;
+
+	ZEND_PARSE_PARAMETERS_START(2, 2)
+		Z_PARAM_ZVAL(op1)
+		Z_PARAM_ZVAL(op2)
+	ZEND_PARSE_PARAMETERS_END();
+
+	RETURN_BOOL(php_colopl_bc_compare(op1, op2) != 0);
+}
+
+PHP_FUNCTION(Colopl_ColoplBc_Php74_lt)
+{
+	zval *op1, *op2;
+
+	ZEND_PARSE_PARAMETERS_START(2, 2)
+		Z_PARAM_ZVAL(op1)
+		Z_PARAM_ZVAL(op2)
+	ZEND_PARSE_PARAMETERS_END();
+
+	RETURN_BOOL(php_colopl_bc_compare(op1, op2) < 0);
+}
+
+PHP_FUNCTION(Colopl_ColoplBc_Php74_lte)
+{
+	zval *op1, *op2;
+
+	ZEND_PARSE_PARAMETERS_START(2, 2)
+		Z_PARAM_ZVAL(op1)
+		Z_PARAM_ZVAL(op2)
+	ZEND_PARSE_PARAMETERS_END();
+
+	RETURN_BOOL(php_colopl_bc_compare(op1, op2) <= 0);
+}
+
+PHP_FUNCTION(Colopl_ColoplBc_Php74_gt)
+{
+	zval *op1, *op2;
+
+	ZEND_PARSE_PARAMETERS_START(2, 2)
+		Z_PARAM_ZVAL(op1)
+		Z_PARAM_ZVAL(op2)
+	ZEND_PARSE_PARAMETERS_END();
+
+	RETURN_BOOL(php_colopl_bc_compare(op1, op2) > 0);
+}
+
+PHP_FUNCTION(Colopl_ColoplBc_Php74_gte)
+{
+	zval *op1, *op2;
+
+	ZEND_PARSE_PARAMETERS_START(2, 2)
+		Z_PARAM_ZVAL(op1)
+		Z_PARAM_ZVAL(op2)
+	ZEND_PARSE_PARAMETERS_END();
+
+	RETURN_BOOL(php_colopl_bc_compare(op1, op2) >= 0);
+}
+
+PHP_FUNCTION(Colopl_ColoplBc_Php74_spaceship)
+{
+	zval *op1, *op2;
+
+	ZEND_PARSE_PARAMETERS_START(2, 2)
+		Z_PARAM_ZVAL(op1)
+		Z_PARAM_ZVAL(op2)
+	ZEND_PARSE_PARAMETERS_END();
+
+	RETURN_LONG(php_colopl_bc_compare(op1, op2));
+}
+
+#else
 
 /* zend_operators.c */
 
@@ -2678,3 +2879,5 @@ PHP_FUNCTION(Colopl_ColoplBc_Php74_spaceship)
 
 	RETURN_LONG(php_colopl_bc_compare(op1, op2));
 }
+
+#endif

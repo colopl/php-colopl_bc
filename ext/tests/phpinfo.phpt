@@ -8,7 +8,7 @@ date.timezone=UTC
 <?php
 ob_start(
     static fn (string $phpinfo): string
-      => str_contains($phpinfo, 'colopl_bc support')
+      => strpos($phpinfo, 'colopl_bc support') !== false
         ? ('Success: ' . \phpversion('colopl_bc'))
         : 'Failure'
 );

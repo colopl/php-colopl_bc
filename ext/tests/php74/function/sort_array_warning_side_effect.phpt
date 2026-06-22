@@ -7,6 +7,8 @@ date.timezone=UTC
 error_log=
 colopl_bc.php74.compare_mode=0
 colopl_bc.php74.sort_mode=3
+--SKIPIF--
+<?php if (PHP_VERSION_ID < 80000) die("skip PHP 8 compatibility diagnostics only"); ?>
 --FILE--
 <?php
 error_reporting(E_ALL);

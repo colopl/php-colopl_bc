@@ -7,16 +7,13 @@ Provides various compatibility functions required for PHP (temporary) migration.
 
 ## Supported Versions
 
-- Extension: PHP >= 8.1, 8.5 >= PHP
-- Library: PHP == 7.4 or PHP >= 8.1, 8.5 >= PHP
+- Extension: PHP == 7.4 or PHP >= 8.1, 8.5 >= PHP
 
-Library is introduced for migration from PHP 7.4 to PHP 8.1+ with the same code base. PHP 8.0 is not supported. If you do not need to work with the same code base, you can use only the Extension.
+PHP 8.0 is not supported. On PHP 7.4, the Extension provides the PHP 7.4 compatibility namespace as thin wrappers around the native PHP APIs.
 
 ## Usage
 
 ### Install
-
-This repository contains an Extension that provides the main compatibility and an assisting Library, each of which must be installed separately.
 
 Extension can be installed in the following steps. Note that the PHP common build tool chain is required.
 
@@ -61,38 +58,6 @@ $ docker run --rm -e VERSION="x.y.z" -v "$(pwd)/artifacts:/tmp/artifacts" "colop
 ```
 
 This target produces `php8.4-colopl-bc_x.y.z_<arch>_ubuntu22.04_sury.deb`.
-
-The library is installed in the following steps.
-
-```bash
-$ composer require "colopl/colopl_bc"
-```
-
-**Be sure to keep the Extension and Library the same version.**
-
-### Code conversion with Rector
-
-The `colopl/colopl_bc` package contains Rector rules to convert your code to the functions provided by the existing `ext-colopl_bc`. This can be utilized to save time when dealing with large code bases.
-
-For each rule, check the rule definition file `src/Rector`. The most common configuration for migrating from PHP 7.x to 8.x is as follows:
-
-```rector.php
-<?php
-/* ~~~ */
-    $rectorConfig->rules([
-        SwitchCaseToEqualRector::class,
-        ArrayFuncToBCMigrateRector::class,
-        SortToBCMigrateRector::class,
-        EqualToBCMigrateRector::class,
-        GreaterToBCMigrateRector::class,
-        GreaterOrEqualToBCMigrateRector::class,
-        NotEqualToBCMigrateRector::class,
-        SmallerToBCMigrateRector::class,
-        SmallerOrEqualToBCMigrateRector::class,
-        SpaceshipToBCMigrateRector::class
-    ]);
-/* ~~~ */
-```
 
 ## API references
 

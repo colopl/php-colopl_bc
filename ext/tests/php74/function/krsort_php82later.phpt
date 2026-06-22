@@ -8,7 +8,7 @@ error_log=
 colopl_bc.php74.compare_mode=3
 colopl_bc.php74.sort_mode=3
 --SKIPIF--
-<?php if (80200 > PHP_VERSION_ID) print 'skip require PHP >= 8.2'; ?>
+<?php if (PHP_VERSION_ID < 80000) die("skip PHP 8 compatibility diagnostics only"); if (80200 > PHP_VERSION_ID) print 'skip require PHP >= 8.2'; ?>
 --FILE--
 <?php
 $array = ['0' => 1, '' => 1, 'a' => 1];

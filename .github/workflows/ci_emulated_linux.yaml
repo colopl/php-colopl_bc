@@ -14,6 +14,8 @@ on:
 jobs:
   Linux:
     runs-on: ubuntu-24.04
+    env:
+      PSKEL_BUILD_TARGET: base
     strategy:
       matrix:
         platform: ['linux/s390x']
@@ -34,19 +36,19 @@ jobs:
           tar -xzf "${ARCHIVE_PATH}" --strip-components=1 -C "${GITHUB_WORKSPACE}"
           rm -f "${ARCHIVE_PATH}"
       - name: Setup QEMU
-        uses: docker/setup-qemu-action@06116385d9baf250c9f4dcb4858b16962ea869c3 # v4.1.0
+        uses: docker/setup-qemu-action@96fe6ef7f33517b61c61be40b68a1882f3264fb8 # v4.2.0
         with:
           platforms: "s390x"
           cache-image: false
       - name: Setup Docker layer caching
-        uses: docker/setup-buildx-action@d7f5e7f509e45cec5c76c4d5afdd7de93d0b3df5 # v4.1.0
+        uses: docker/setup-buildx-action@bb05f3f5519dd87d3ba754cc423b652a5edd6d2c # v4.2.0
         with:
           driver-opts: |
             image=moby/buildkit:latest
           buildkitd-flags: --debug
       - name: Login to GitHub Container Registry
         if: github.event_name != 'pull_request'
-        uses: docker/login-action@650006c6eb7dba73a995cc03b0b2d7f5ca915bee # v4.2.0
+        uses: docker/login-action@abd2ef45e78c5afb21d64d4ca52ee8550d9572c7 # v4.5.1
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
@@ -56,20 +58,20 @@ jobs:
           docker pull --platform "${{ matrix.platform }}" "php:${{ matrix.version }}-${{ matrix.type }}-${{ matrix.distro }}"
       - name: Cut arch name
         id: cut-arch
-        run: echo "arch=$(echo "${{ matrix.platform }}" | sed 's|linux/||')" >> $GITHUB_OUTPUT
+        run: echo "arch=$(echo "${{ matrix.platform }}" | sed 's|linux/||')" >> "${GITHUB_OUTPUT}"
       - name: Generate image tag
         id: image-tag
         run: |
           TAG="ghcr.io/${{ github.repository }}/ci-emulated-cache:${{ steps.cut-arch.outputs.arch }}-${{ matrix.version }}-${{ matrix.type }}-${{ matrix.distro }}-${{ hashFiles('**/Dockerfile', '**/compose.yaml', '**/pskel.sh', '.pskel/**') }}"
-          echo "tag=${TAG}" >> $GITHUB_OUTPUT
+          echo "tag=${TAG}" >> "${GITHUB_OUTPUT}"
       - name: Check if image exists
         id: check-image
         run: |
           if docker manifest inspect "${{ steps.image-tag.outputs.tag }}" >/dev/null 2>&1; then
-            echo "exists=true" >> $GITHUB_OUTPUT
+            echo "exists=true" >> "${GITHUB_OUTPUT}"
             echo "Image already exists, will reuse: ${{ steps.image-tag.outputs.tag }}"
           else
-            echo "exists=false" >> $GITHUB_OUTPUT
+            echo "exists=false" >> "${GITHUB_OUTPUT}"
             echo "Image does not exist, will build: ${{ steps.image-tag.outputs.tag }}"
           fi
       - name: Build container

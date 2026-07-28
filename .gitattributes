@@ -4,12 +4,10 @@
 /.dockerignore       export-ignore
 /.editorconfig       export-ignore
 /.github/            export-ignore
-/.gitmodules         export-ignore
 /.vscode/            export-ignore
 /build/              export-ignore
 /patches/            export-ignore
 /tests/              export-ignore
-/third_party/        export-ignore
 /ext/tests/          export-ignore
 /ext/description-pak export-ignore
 Dockerfile           export-ignore

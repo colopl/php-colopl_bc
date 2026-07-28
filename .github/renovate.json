@@ -5,29 +5,40 @@
   ],
   "automerge": false,
   "prHourlyLimit": 0,
-  "git-submodules": {
-    "enabled": true
+  "customDatasources": {
+    "valgrind": {
+      "defaultRegistryUrlTemplate": "https://sourceware.org/pub/valgrind/",
+      "format": "html"
+    }
   },
-  "packageRules": [
+  "customManagers": [
     {
-      "description": "Custom tag format",
-      "matchManagers": [
-        "git-submodules"
+      "customType": "regex",
+      "description": "Track Valgrind releases from the official download directory",
+      "managerFilePatterns": [
+        "/(^|/)Dockerfile$/"
       ],
-      "matchDepNames": [
-        "third_party/valgrind"
+      "matchStrings": [
+        "# renovate: datasource=custom\\.valgrind depName=valgrind\\s*\\nARG VALGRIND_VERSION=(?<currentValue>\\d+\\.\\d+(?:\\.\\d+)?)"
       ],
-      "versioning": "regex:^VALGRIND_(?<major>\\d+)_(?<minor>\\d+)_(?<patch>\\d+)$"
+      "depNameTemplate": "valgrind",
+      "datasourceTemplate": "custom.valgrind",
+      "extractVersionTemplate": "^valgrind-(?<version>\\d+\\.\\d+(?:\\.\\d+)?)\\.tar\\.bz2$",
+      "versioningTemplate": "semver-coerced"
     },
     {
-      "description": "Disable digest updates for git submodules",
-      "matchManagers": [
-        "git-submodules"
+      "customType": "regex",
+      "description": "Track the latest stable LLVM major version from official releases",
+      "managerFilePatterns": [
+        "/(^|/)Dockerfile$/"
       ],
-      "matchUpdateTypes": [
-        "digest"
+      "matchStrings": [
+        "# renovate: datasource=github-releases depName=llvm/llvm-project\\s*\\nARG LLVM_VERSION=(?<currentValue>\\d+)"
       ],
-      "enabled": false
+      "depNameTemplate": "llvm/llvm-project",
+      "datasourceTemplate": "github-releases",
+      "extractVersionTemplate": "^llvmorg-(?<version>\\d+)\\.\\d+\\.\\d+$",
+      "versioningTemplate": "semver-coerced"
     }
   ]
 }

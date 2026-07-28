@@ -14,6 +14,8 @@ on:
 jobs:
   init:
     runs-on: ubuntu-24.04
+    env:
+      PSKEL_BUILD_TARGET: base
     outputs:
       needs-init: ${{ steps.check.outputs.needs-init }}
     steps:
@@ -33,9 +35,9 @@ jobs:
         id: check
         run: |
           if test -f "ext/.gitkeep" && test "$(cat "ext/.gitkeep")" = "pskel_uninitialized"; then
-            echo "needs-init=true" >> $GITHUB_OUTPUT
+            echo "needs-init=true" >> "${GITHUB_OUTPUT}"
           else
-            echo "needs-init=false" >> $GITHUB_OUTPUT
+            echo "needs-init=false" >> "${GITHUB_OUTPUT}"
           fi
       - name: Initialize extension
         if: steps.check.outputs.needs-init == 'true'
@@ -85,28 +87,14 @@ jobs:
         run: |
           $name = (Get-Content .\ext\config.w32 | Select-String "EXTENSION\('([^']+)'" | ForEach-Object { $_.Matches[0].Groups[1].Value })
           echo "name=$name" >> $env:GITHUB_OUTPUT
-      - name: Setup PHP
-        id: setup-php
-        uses: php/setup-php-sdk@e2ce1c294f272ed93e8083f14649f5adadf93788 # v0.12
+      - name: Stage extension source for Windows builder
+        shell: pwsh
+        run: |
+          Get-ChildItem -LiteralPath .\ext -Force | Copy-Item -Destination . -Recurse -Force
+      - name: Build and Test
+        uses: php/php-windows-builder/extension@29352c0ef9e8ce65264ea9e287881a6f7758a953 # 1.9.0
         with:
-          version: ${{ matrix.version }}
+          php-version: ${{ matrix.version }}
           arch: ${{ matrix.arch }}
           ts: ${{ matrix.ts }}
-          cache: true
-      - name: Enable Developer Command Prompt
-        uses: ilammy/msvc-dev-cmd@0b201ec74fa43914dc39ae48a89fd1d8cb592756 # v1.13.0
-        with:
-          arch: ${{ matrix.arch }}
-          toolset: ${{ steps.setup-php.outputs.toolset }}
-      - name: phpize and configure
-        run: |
-          cd "ext"
-          phpize
-          ./configure.bat --enable-${{ steps.ext-name.outputs.name }} --with-prefix=${{ steps.setup-php.outputs.prefix }}
-      - name: Build and Test
-        env:
-          TEST_PHP_ARGS: '-q --show-diff'
-        run: |
-          cd "ext"
-          nmake
-          nmake test
+          args: --enable-${{ steps.ext-name.outputs.name }}

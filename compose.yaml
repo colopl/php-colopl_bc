@@ -7,6 +7,7 @@ services:
     build:
       context: ./
       dockerfile: ./Dockerfile
+      target: ${PSKEL_BUILD_TARGET:-devcontainer}
     cap_add:
       - SYS_ADMIN
     security_opt:

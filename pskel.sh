@@ -13,7 +13,7 @@ get_pskel_root_dir() {
       ;;
   esac
 
-  if command -v readlink >/dev/null 2>&1; then
+  if type "readlink" >/dev/null 2>&1; then
     PSKEL_PATH="$(readlink -f "${PSKEL_PATH}" 2>/dev/null || printf '%s' "${PSKEL_PATH}")"
   fi
 
@@ -46,7 +46,7 @@ get_workspace_dir() {
     echo "${PWD_WORKSPACE_DIR}"
   elif test -d "${CODESPACE_VSCODE_FOLDER}"; then
     echo "${CODESPACE_VSCODE_FOLDER}"
-  elif test -d "/workspace"; then
+  elif test -f "/workspace/pskel.sh" && test -f "/workspace/.pskel/LICENSE.template"; then
     echo "/workspace"
   elif test -d "/workspaces/pskel"; then
     echo "/workspaces/pskel"
@@ -311,10 +311,13 @@ cmd_usage() {
 Usage: ${0} [task] ...
 
 Available commands:
-    init        create new extension
-    test        test extension
-    build       build PHP runtime
-    coverage    generate code coverage
+    init               create new extension
+    test               test extension
+    build              build PHP runtime
+    clean-build-cache  remove built PHP runtimes and cache
+    coverage           generate code coverage
+    coverage-report    merge lcov .info files and generate HTML report
+    package            build and package a PIE pre-packaged binary
 EOF
 }
 
@@ -373,7 +376,7 @@ EOF
     "license": "BSD-3-Clause",
     "description": "Describe your extension here",
     "require": {
-        "php": "~8.1.0"
+        "php": ">= 8.1"
     },
     "php-ext": {
         "extension-name": "${EXT_NAME}",
@@ -402,6 +405,8 @@ COMPOSER_EOF
 }
 
 cmd_test() {
+  PSKEL_TRACK_ARENA_ALLOC=0
+
   case "${1}" in
     -h|--help)
       cat << EOF
@@ -425,6 +430,7 @@ EOF
       return 0
       ;;
     debug|gcov|valgrind)
+      PSKEL_TRACK_ARENA_ALLOC=1
       CC="$(command -v "gcc")"
       CXX="$(command -v "g++")"
       case "${1}" in
@@ -443,6 +449,7 @@ EOF
       CMD="$(basename "${CC}")-${1}-php"
       ;;
     msan|asan|ubsan)
+      PSKEL_TRACK_ARENA_ALLOC=1
       CC="$(command -v "clang")"
       CXX="$(command -v "clang++")"
       case "${1}" in
@@ -476,13 +483,18 @@ EOF
   esac
 
   for BIN in "${CMD}" "${CMD}ize" "${CMD}-config"; do
-    if ! command -v "${BIN}" >/dev/null 2>&1; then
+    if ! type "${BIN}" >/dev/null 2>&1; then
       echo "Error: Invalid argument '${CMD}', executable file not found" >&2
       exit 1
     fi
   done
 
   PSKEL_EXT_DIR="$(get_ext_dir)"
+
+  if test "${PSKEL_TRACK_ARENA_ALLOC}" = "1"; then
+    CFLAGS="${CFLAGS} -DZEND_TRACK_ARENA_ALLOC"
+    CPPFLAGS="${CPPFLAGS} -DZEND_TRACK_ARENA_ALLOC"
+  fi
 
   cd "${PSKEL_EXT_DIR}"
     "${CMD}ize"
@@ -538,11 +550,13 @@ check_and_restore_cached_php() {
   if test -f "${CACHE_DIR}/.build_complete"; then
     for BIN in php phpize php-config; do
       if test -f "${CACHE_DIR}/usr/local/bin/${PREFIX}-${BIN}"; then
+        remove_path_if_exists "/usr/local/bin/${PREFIX}-${BIN}"
         ln -sf "${CACHE_DIR}/usr/local/bin/${PREFIX}-${BIN}" "/usr/local/bin/${PREFIX}-${BIN}"
       fi
     done
 
     if test -d "${CACHE_DIR}/usr/local/include/${PREFIX}-php"; then
+      remove_path_if_exists "/usr/local/include/${PREFIX}-php"
       ln -sf "${CACHE_DIR}/usr/local/include/${PREFIX}-php" "/usr/local/include/${PREFIX}-php"
     fi
 
@@ -603,6 +617,71 @@ cache_php_build() {
   echo "[Pskel > Cache] Cached PHP header and binary: ${PREFIX}-php" >&2
 }
 
+remove_path_if_exists() {
+  if test -e "${1}" || test -L "${1}"; then
+    rm -rf "${1}"
+    echo "[Pskel > Clean] Removed: ${1}" >&2
+  fi
+}
+
+remove_built_php_runtime() {
+  PREFIX="${1}"
+
+  for BIN in php phpize php-config; do
+    remove_path_if_exists "/usr/local/bin/${PREFIX}-${BIN}"
+  done
+
+  remove_path_if_exists "/usr/local/include/${PREFIX}-php"
+}
+
+cmd_clean_build_cache() {
+  case "${1}" in
+    -h|--help)
+      cat << EOF
+Usage: ${0} clean-build-cache
+Environment variables:
+  PHP_CACHE_DIR:        PHP runtime cache directory
+EOF
+      return 0
+      ;;
+    ?*)
+      echo "Error: clean-build-cache does not accept arguments." >&2
+      return 1
+      ;;
+  esac
+
+  for PREFIX in \
+    gcc-debug gcc-debug-static gcc-gcov gcc-valgrind \
+    clang-msan clang-asan clang-ubsan
+  do
+    remove_built_php_runtime "${PREFIX}"
+  done
+
+  if test -n "${PHP_CACHE_DIR}" && test -d "${PHP_CACHE_DIR}"; then
+    for CACHE_ENTRY in "${PHP_CACHE_DIR}"/*; do
+      if test -f "${CACHE_ENTRY}/.build_complete"; then
+        if test -d "${CACHE_ENTRY}/usr/local/bin"; then
+          for BIN in "${CACHE_ENTRY}/usr/local/bin/"*; do
+            if test -f "${BIN}"; then
+              remove_path_if_exists "/usr/local/bin/$(basename "${BIN}")"
+            fi
+          done
+        fi
+
+        if test -d "${CACHE_ENTRY}/usr/local/include"; then
+          for INCLUDE_DIR in "${CACHE_ENTRY}/usr/local/include/"*; do
+            if test -d "${INCLUDE_DIR}"; then
+              remove_path_if_exists "/usr/local/include/$(basename "${INCLUDE_DIR}")"
+            fi
+          done
+        fi
+
+        remove_path_if_exists "${CACHE_ENTRY}"
+      fi
+    done
+  fi
+}
+
 cmd_build() {
   case "${1}" in
     -h|--help)
@@ -648,42 +727,178 @@ EOF
   lcov --capture --directory "${PSKEL_EXT_DIR}" \
     ${LCOV_OPTS} \
     --exclude "/usr/local/include/*" \
-    --output-file "${PSKEL_EXT_DIR}/lcov.info"
+    --output-file "${PSKEL_EXT_DIR}/lcov.info.tmp"
 
-  # Convert lcov 2.0 FNL/FNA records to legacy FN/FNDA for CI compatibility.
-  awk 'BEGIN { _n = 0 }
-    /^FNL:/ {
-      split($0, a, /[,:]/)
-      _start[a[2]] = a[3]
-      next
-    }
-    /^FNA:/ {
-      idx = ""
-      cnt = ""
-      rest = $0
-      sub(/^FNA:/, "", rest)
-      split(rest, b, /,/)
-      idx = b[1]
-      cnt = b[2]
-      sub(/^[^,]*,[^,]*,/, "", rest)
-      _fn[_n] = "FN:" _start[idx] "," rest
-      _fnda[_n] = "FNDA:" cnt "," rest
-      _n++
-      next
-    }
-    /^FNF:/ {
-      for (i = 0; i < _n; i++) print _fn[i]
-      for (i = 0; i < _n; i++) print _fnda[i]
-      _n = 0
-      print
-      next
-    }
-    { print }
-  ' "${PSKEL_EXT_DIR}/lcov.info" > "${PSKEL_EXT_DIR}/lcov.info.tmp" \
-    && cat "${PSKEL_EXT_DIR}/lcov.info.tmp" > "${PSKEL_EXT_DIR}/lcov.info" \
+  cat "${PSKEL_EXT_DIR}/lcov.info.tmp" > "${PSKEL_EXT_DIR}/lcov.info" \
     && rm -f "${PSKEL_EXT_DIR}/lcov.info.tmp"
 
   lcov --list "${PSKEL_EXT_DIR}/lcov.info"
+}
+
+cmd_coverage_report() {
+  case "${1}" in
+    -h|--help)
+      cat << EOF
+Usage: ${0} coverage-report <info_dir> <output_dir>
+Merge all lcov .info files in <info_dir> and generate an HTML report in
+<output_dir> (merged data is written to <output_dir>/total.info). Shards must
+be captured with the same container image so lcov versions match.
+Environment variables:
+  GENHTML_OPTS:    genhtml options
+EOF
+      return 0
+      ;;
+  esac
+
+  INFO_DIR="${1}"
+  OUTPUT_DIR="${2}"
+
+  if test -z "${INFO_DIR}" || test -z "${OUTPUT_DIR}"; then
+    echo "Error: info_dir and output_dir are required." >&2
+    return 1
+  fi
+
+  if ! test -d "${INFO_DIR}"; then
+    echo "Error: info_dir '${INFO_DIR}' does not exist." >&2
+    return 1
+  fi
+
+  INFO_FILES=""
+  for INFO_FILE in "${INFO_DIR}"/*.info; do
+    if ! test -f "${INFO_FILE}"; then
+      continue
+    fi
+    if test "$(basename "${INFO_FILE}")" = "total.info"; then
+      echo "[Pskel > Coverage] Skipping previously merged file: ${INFO_FILE}" >&2
+      continue
+    fi
+    INFO_FILES="${INFO_FILES} ${INFO_FILE}"
+  done
+
+  if test -z "${INFO_FILES}"; then
+    echo "Error: no .info files found in '${INFO_DIR}'." >&2
+    return 1
+  fi
+
+  MERGE_ARGS=""
+  for INFO_FILE in ${INFO_FILES}; do
+    verify_function_records "${INFO_FILE}" || return 1
+    lcov --summary "${INFO_FILE}" || return 1
+    MERGE_ARGS="${MERGE_ARGS} -a ${INFO_FILE}"
+  done
+
+  mkdir -p "${OUTPUT_DIR}"
+
+  lcov ${MERGE_ARGS} --output-file "${OUTPUT_DIR}/total.info" || return 1
+
+  verify_function_records "${OUTPUT_DIR}/total.info" || return 1
+
+  genhtml "${OUTPUT_DIR}/total.info" \
+    ${GENHTML_OPTS} \
+    --output-directory "${OUTPUT_DIR}" \
+    --title "Extension code coverage" || return 1
+
+  lcov --summary "${OUTPUT_DIR}/total.info"
+}
+
+verify_function_records() {
+  for RECORD in "FNL:" "FNA:" "FNF:" "FNH:"; do
+    if ! grep -q "^${RECORD}" "${1}"; then
+      echo "Error: missing ${RECORD} records in '${1}'." >&2
+      return 1
+    fi
+  done
+}
+
+cmd_package() {
+  case "${1}" in
+    -h|--help)
+      cat << EOF
+Usage: ${0} package <release_tag> [output_dir] [extension_name]
+Build the extension against the environment PHP and package the shared object
+as a PIE pre-packaged binary, using the same naming convention as
+php/pie-ext-binary-builder:
+  php_{ext}-{tag}_php{maj.min}-{arch}-{os}-{libc}[-debug][-zts].zip
+Environment variables:
+  EXT_CONFIGURE_OPTS:    extra ./configure options
+EOF
+      return 0
+      ;;
+    "")
+      echo "Error: release tag is required." >&2
+      return 1
+      ;;
+  esac
+
+  RELEASE_TAG="${1}"
+  OUTPUT_DIR="${2:-.}"
+  PKG_EXT_NAME="${3}"
+
+  PSKEL_EXT_DIR="$(get_ext_dir)"
+
+  if test -z "${PKG_EXT_NAME}"; then
+    PKG_WORKSPACE_DIR="$(get_workspace_dir 2>/dev/null)" || PKG_WORKSPACE_DIR=""
+    if test -n "${PKG_WORKSPACE_DIR}" && test -f "${PKG_WORKSPACE_DIR}/composer.json"; then
+      PKG_EXT_NAME="$(COMPOSER_JSON_PATH="${PKG_WORKSPACE_DIR}/composer.json" php -n -r '
+        $manifest = json_decode((string) file_get_contents(getenv("COMPOSER_JSON_PATH")), true);
+        $name = $manifest["php-ext"]["extension-name"] ?? basename((string) ($manifest["name"] ?? ""));
+        echo preg_replace("/^ext-/", "", (string) $name);
+      ')"
+    fi
+  fi
+  if test -z "${PKG_EXT_NAME}"; then
+    PKG_EXT_NAME="$(sed -n 's/^PHP_NEW_EXTENSION(\[\{0,1\}\([A-Za-z0-9_]*\).*/\1/p' "${PSKEL_EXT_DIR}/config.m4" | head -n 1)"
+  fi
+  if test -z "${PKG_EXT_NAME}"; then
+    echo "Error: could not determine extension name; pass it as the third argument." >&2
+    return 1
+  fi
+
+  cd "${PSKEL_EXT_DIR}"
+    phpize
+    if test "$(uname -s)" != "Darwin" && test "$(php -r "echo PHP_VERSION_ID;")" -lt "80400"; then
+      patch "./build/ltmain.sh" "./../patches/ltmain.sh.patch"
+      echo "[Pskel] ltmain.sh patched" >&2
+    fi
+    ./configure --with-php-config="$(command -v "php-config")" ${EXT_CONFIGURE_OPTS}
+    make clean
+    make -j"$(nproc 2>/dev/null || sysctl -n hw.ncpu)"
+  cd -
+
+  if ! php -n -d "extension=${PSKEL_EXT_DIR}/modules/${PKG_EXT_NAME}.so" -m | grep -q "^${PKG_EXT_NAME}\$"; then
+    echo "Error: built ${PKG_EXT_NAME}.so failed to load." >&2
+    return 1
+  fi
+
+  PKG_PHP_MAJMIN="$(php-config --version | cut -d. -f1,2)"
+  case "$(uname -m)" in
+    x86_64|amd64) PKG_ARCH="x86_64";;
+    aarch64|arm64) PKG_ARCH="arm64";;
+    i386|i486|i586|i686) PKG_ARCH="x86";;
+    *) echo "Error: unsupported architecture '$(uname -m)'." >&2; return 1;;
+  esac
+  case "$(uname -s)" in
+    Linux) PKG_OS="linux";;
+    Darwin) PKG_OS="darwin";;
+    *) echo "Error: unsupported operating system '$(uname -s)'." >&2; return 1;;
+  esac
+  if test "${PKG_OS}" = "darwin"; then
+    PKG_LIBC="bsdlibc"
+  elif test -f "/etc/alpine-release" || ldd --version 2>&1 | grep -qi "musl"; then
+    PKG_LIBC="musl"
+  else
+    PKG_LIBC="glibc"
+  fi
+  PKG_DEBUG="$(php -n -r 'echo PHP_DEBUG ? "-debug" : "";')"
+  PKG_ZTS="$(php -n -r 'echo ZEND_THREAD_SAFE ? "-zts" : "";')"
+
+  PKG_NAME="php_${PKG_EXT_NAME}-${RELEASE_TAG}_php${PKG_PHP_MAJMIN}-${PKG_ARCH}-${PKG_OS}-${PKG_LIBC}${PKG_DEBUG}${PKG_ZTS}.zip"
+
+  mkdir -p "${OUTPUT_DIR}"
+  rm -f "${OUTPUT_DIR}/${PKG_NAME}"
+  zip -j "${OUTPUT_DIR}/${PKG_NAME}" "${PSKEL_EXT_DIR}/modules/${PKG_EXT_NAME}.so"
+
+  echo "[Pskel > Package] Created: ${OUTPUT_DIR}/${PKG_NAME}"
 }
 
 if test $# -eq 0; then
@@ -696,7 +911,10 @@ case "${1}" in
   init) shift; cmd_init "${@}";;
   test) shift; cmd_test "${@}";;
   build) shift; cmd_build "${@}";;
+  clean-build-cache) shift; cmd_clean_build_cache "${@}";;
   coverage) shift; cmd_coverage "${@}";;
+  coverage-report) shift; cmd_coverage_report "${@}";;
+  package) shift; cmd_package "${@}";;
   *)
     echo "${0} error: invalid command: '${1}'" >&2
     cmd_usage

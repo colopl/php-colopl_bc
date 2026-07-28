@@ -14,6 +14,8 @@ on:
         type: string
 jobs:
   Linux:
+    env:
+      PSKEL_BUILD_TARGET: base
     strategy:
       matrix:
         runs-on: ['ubuntu-24.04', 'ubuntu-24.04-arm']
@@ -46,7 +48,7 @@ jobs:
           ARCH="$(uname -m)"
           echo "key=php-bins-${{ matrix.version }}-${{ matrix.type }}-${{ matrix.distro }}-${ARCH}-${{ steps.pull-image.outputs.image_hash }}" >> "${GITHUB_OUTPUT}"
       - name: Cache PHP binaries
-        uses: actions/cache@v5
+        uses: actions/cache@v6
         with:
           path: php-cache
           key: ${{ steps.cache-key.outputs.key }}
@@ -59,7 +61,7 @@ jobs:
           else
             mkdir -p "php-cache"
           fi
-          docker compose build --no-cache --build-arg IMAGE="php" --build-arg TAG="${{ matrix.version }}-${{ matrix.type }}-${{ matrix.distro }}"
+          docker compose build --no-cache --build-arg IMAGE="php" --build-arg TAG="${{ matrix.version }}-${{ matrix.type }}-${{ matrix.distro }}" --build-arg SKIP_VALGRIND="${{ matrix.distro == 'alpine' && '1' || '0' }}"
       - name: Test extension with Bundled PHP
         run: docker compose run --rm -v "$(pwd)/php-cache:/opt/php-cache" -e PHP_CACHE_DIR="/opt/php-cache" -e GITHUB_ACTIONS="true" -e CONTAINER_IMAGE_HASH="${{ steps.pull-image.outputs.image_hash }}" shell pskel test
       - name: Test extension with PHP Debug Build (in-tree static)

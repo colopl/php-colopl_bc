@@ -1,0 +1,49 @@
+name: 'Cleanup GHCR'
+on:
+  schedule:
+    - cron: '26 19 * * *'
+  workflow_dispatch:
+    inputs:
+      older-than-days:
+        description: 'Delete ci-emulated-cache image versions older than this many days (0 deletes the whole package)'
+        required: false
+        default: '7'
+permissions:
+  packages: write
+jobs:
+  ghcr-emulated-cache:
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Delete stale ci-emulated-cache image versions
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          OLDER_THAN_DAYS: ${{ github.event.inputs.older-than-days || '7' }}
+        run: |
+          PACKAGE_PATH="/orgs/${GITHUB_REPOSITORY_OWNER}/packages/container/$(printf '%s' "${GITHUB_REPOSITORY#*/}/ci-emulated-cache" | sed 's|/|%2F|g')"
+          if test "${OLDER_THAN_DAYS}" = "0"; then
+            if gh api -X DELETE "${PACKAGE_PATH}" >/dev/null 2>&1; then
+              echo "Deleted the entire ci-emulated-cache package."
+            else
+              echo "Package not found, nothing to delete."
+            fi
+            exit 0
+          fi
+          CUTOFF="$(date -u -d "${OLDER_THAN_DAYS} days ago" "+%Y-%m-%dT%H:%M:%SZ")"
+          echo "Deleting image versions created before ${CUTOFF}."
+          VERSION_IDS="$(gh api --paginate "${PACKAGE_PATH}/versions?per_page=100" --jq ".[] | select(.created_at < \"${CUTOFF}\") | .id" 2>/dev/null)" || {
+            echo "Package not found, nothing to delete."
+            exit 0
+          }
+          if test -z "${VERSION_IDS}"; then
+            echo "No stale image versions found."
+            exit 0
+          fi
+          DELETED=0
+          for VERSION_ID in ${VERSION_IDS}; do
+            if gh api -X DELETE "${PACKAGE_PATH}/versions/${VERSION_ID}" >/dev/null; then
+              DELETED=$((DELETED + 1))
+            else
+              echo "Warning: could not delete version ${VERSION_ID} (possibly the last remaining version)." >&2
+            fi
+          done
+          echo "Deleted ${DELETED} image version(s)."

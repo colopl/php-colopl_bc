@@ -14,6 +14,8 @@ on:
 jobs:
   init:
     runs-on: ubuntu-24.04
+    env:
+      PSKEL_BUILD_TARGET: base
     outputs:
       needs-init: ${{ steps.check.outputs.needs-init }}
     steps:
@@ -36,9 +38,9 @@ jobs:
         id: check
         run: |
           if test -f "ext/.gitkeep" && test "$(cat "ext/.gitkeep")" = "pskel_uninitialized"; then
-            echo "needs-init=true" >> $GITHUB_OUTPUT
+            echo "needs-init=true" >> "${GITHUB_OUTPUT}"
           else
-            echo "needs-init=false" >> $GITHUB_OUTPUT
+            echo "needs-init=false" >> "${GITHUB_OUTPUT}"
           fi
       - name: Initialize extension
         if: steps.check.outputs.needs-init == 'true'

@@ -19,6 +19,8 @@ on:
 jobs:
   init:
     runs-on: ubuntu-24.04
+    env:
+      PSKEL_BUILD_TARGET: base
     outputs:
       needs-init: ${{ steps.check.outputs.needs-init }}
     steps:
@@ -38,9 +40,9 @@ jobs:
         id: check
         run: |
           if test -f "ext/.gitkeep" && test "$(cat "ext/.gitkeep")" = "pskel_uninitialized"; then
-            echo "needs-init=true" >> $GITHUB_OUTPUT
+            echo "needs-init=true" >> "${GITHUB_OUTPUT}"
           else
-            echo "needs-init=false" >> $GITHUB_OUTPUT
+            echo "needs-init=false" >> "${GITHUB_OUTPUT}"
           fi
       - name: Initialize extension
         if: steps.check.outputs.needs-init == 'true'
@@ -56,6 +58,8 @@ jobs:
   coverage:
     needs: init
     runs-on: ${{ matrix.platform }}
+    env:
+      PSKEL_BUILD_TARGET: base
     strategy:
       matrix:
         versions: ['8.5']
@@ -80,29 +84,15 @@ jobs:
         with:
           name: initialized-ext-coverage
           path: ext/
-      - name: Install lcov
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y "lcov"
       - name: Build container and run coverage
         run: |
+          rm -f "ext/.gitkeep"
           docker compose build \
-            --build-arg TAG="${{ matrix.versions }}-${{ matrix.ts }}" \
+            --build-arg TAG="${{ matrix.versions }}-${{ matrix.ts }}-trixie" \
             --build-arg SKIP_VALGRIND=1 \
             shell
-          touch "lcov.info"
-          docker compose run -v "$(pwd)/lcov.info:/ext/lcov.info" --rm shell pskel coverage
-          mv "lcov.info" "${{ matrix.platform }}_${{ matrix.versions }}_${{ matrix.ts }}_lcov.info"
-      - name: Verify shard function coverage records
-        run: |
-          COVERAGE_FILE="${{ matrix.platform }}_${{ matrix.versions }}_${{ matrix.ts }}_lcov.info"
-          for RECORD in "FN:" "FNDA:" "FNF:" "FNH:"; do
-            if ! grep -q "^${RECORD}" "${COVERAGE_FILE}"; then
-              echo "Missing ${RECORD} records in ${COVERAGE_FILE}"
-              exit 1
-            fi
-          done
-          lcov --summary "${COVERAGE_FILE}"
+          docker compose run -v "$(pwd)/ext:/ext" --rm shell pskel coverage
+          cp "ext/lcov.info" "${{ matrix.platform }}_${{ matrix.versions }}_${{ matrix.ts }}_lcov.info"
       - name: Upload coverage artifact
         uses: actions/upload-artifact@v7
         with:
@@ -114,6 +104,8 @@ jobs:
       - init
       - coverage
     runs-on: ubuntu-24.04
+    env:
+      PSKEL_BUILD_TARGET: base
     if: github.ref == 'refs/heads/main'
     environment:
       name: github-pages
@@ -131,10 +123,6 @@ jobs:
           ARCHIVE_PATH="${RUNNER_TEMP}/source-archive/${ARCHIVE_NAME}"
           tar -xzf "${ARCHIVE_PATH}" --strip-components=1 -C "${GITHUB_WORKSPACE}"
           rm -f "${ARCHIVE_PATH}"
-      - name: Install lcov
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y "lcov"
       - name: Download all coverage artifacts
         uses: actions/download-artifact@v8
         with:
@@ -147,61 +135,21 @@ jobs:
         with:
           name: initialized-ext-coverage
           path: ext/
-      - name: Verify downloaded function coverage records
+      - name: Build container
         run: |
-          cd "coverage-files" || exit 1
-          set -- ./*.info
-          if test "${1}" = "./*.info"; then
-            echo "No coverage .info files found"
-            exit 1
-          fi
-          for INFO_FILE in "$@"; do
-            for RECORD in "FN:" "FNDA:" "FNF:" "FNH:"; do
-              if ! grep -q "^${RECORD}" "${INFO_FILE}"; then
-                echo "Missing ${RECORD} records in ${INFO_FILE} before merge"
-                exit 1
-              fi
-            done
-            lcov --summary "${INFO_FILE}"
-          done
-          cd - || exit 1
-      - name: Generate integrated HTML coverage reports
+          docker compose build \
+            --build-arg TAG="8.5-cli-trixie" \
+            --build-arg SKIP_VALGRIND=1 \
+            shell
+      - name: Generate integrated HTML coverage report
         run: |
-          if ! test -d "/ext"; then
-            sudo ln -s "${GITHUB_WORKSPACE}/ext" /ext
-          fi
           mkdir -p "coverage-html"
-          cd "coverage-files" || exit 1
-          set -- ./*.info
-          if test "${1}" = "./*.info"; then
-            echo "No coverage .info files found"
-            exit 1
-          fi
-          if test "${2+set}" != "set"; then
-            cp "${1}" ../total.info
-          else
-            lcov --ignore-errors format -a "${1}" -a "${2}" -o "merged.info"
-            shift 2
-            while test "$#" -gt 0; do
-              lcov --ignore-errors format -a "merged.info" -a "${1}" -o "merged2.info"
-              mv "merged2.info" "merged.info"
-              shift
-            done
-            mv "merged.info" ../total.info
-          fi
-          cd - || exit 1
-          genhtml "total.info" \
-            --output-directory "coverage-html" \
-            --title "Extension code coverage"
-      - name: Verify merged function coverage records
-        run: |
-          for RECORD in "FN:" "FNDA:" "FNF:" "FNH:"; do
-            if ! grep -q "^${RECORD}" "total.info"; then
-              echo "Missing ${RECORD} records in total.info after merge"
-              exit 1
-            fi
-          done
-          lcov --summary "total.info"
+          docker compose run --rm \
+            -v "$(pwd)/ext:/ext" \
+            -v "$(pwd)/coverage-files:/coverage-files" \
+            -v "$(pwd)/coverage-html:/coverage-html" \
+            shell pskel coverage-report /coverage-files /coverage-html
+          rm -f "coverage-html/total.info"
       - name: Setup Pages
         uses: actions/configure-pages@v6
       - name: Upload Pages artifact

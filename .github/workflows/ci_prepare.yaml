@@ -24,7 +24,32 @@ jobs:
         uses: actions/checkout@v7
         with:
           fetch-depth: 1
-          submodules: recursive
+      - name: Detect Valgrind version
+        id: valgrind
+        run: |
+          VALGRIND_VERSION="$(sed -n 's/^ARG VALGRIND_VERSION=//p' "Dockerfile" | head -n 1)"
+          if test -z "${VALGRIND_VERSION}"; then
+            echo "Error: VALGRIND_VERSION not found in Dockerfile." >&2
+            exit 1
+          fi
+          echo "version=${VALGRIND_VERSION}" >> "${GITHUB_OUTPUT}"
+      - name: Cache Valgrind tarball
+        uses: actions/cache@v6
+        with:
+          path: valgrind-${{ steps.valgrind.outputs.version }}.tar.bz2
+          key: valgrind-tarball-${{ steps.valgrind.outputs.version }}
+      - name: Download Valgrind tarball if not cached
+        env:
+          VALGRIND_VERSION: ${{ steps.valgrind.outputs.version }}
+        run: |
+          VALGRIND_TARBALL="valgrind-${VALGRIND_VERSION}.tar.bz2"
+          if test -f "${VALGRIND_TARBALL}"; then
+            echo "Valgrind tarball restored from cache."
+          else
+            curl -fsSL --retry 5 --retry-delay 10 --retry-all-errors \
+              -o "${VALGRIND_TARBALL}" \
+              "https://sourceware.org/pub/valgrind/valgrind-${VALGRIND_VERSION}.tar.bz2"
+          fi
       - name: Record artifact metadata
         id: metadata
         run: |

@@ -12,7 +12,8 @@ jobs:
   CreateDraftRelease:
     runs-on: ubuntu-latest
     outputs:
-      package_version: ${{ steps.package-version.outputs.version }}
+      package_version: ${{ steps.metadata.outputs.version }}
+      extension_name: ${{ steps.metadata.outputs.extension-name }}
     permissions:
       contents: write
     steps:
@@ -20,9 +21,16 @@ jobs:
         with:
           fetch-tags: 'true'
           ref: ${{ github.ref }}
-      - name: Normalize package version
-        id: package-version
-        run: echo "version=${GITHUB_REF_NAME#v}" >> "${GITHUB_OUTPUT}"
+      - name: Extract release metadata
+        id: metadata
+        run: |
+          EXT_NAME="$(jq -r '."php-ext"."extension-name" // empty' "composer.json")"
+          if test -z "${EXT_NAME}"; then
+            echo "Error: php-ext.extension-name not found in composer.json." >&2
+            exit 1
+          fi
+          echo "extension-name=${EXT_NAME}" >> "${GITHUB_OUTPUT}"
+          echo "version=${GITHUB_REF_NAME#v}" >> "${GITHUB_OUTPUT}"
       - name: Create draft release from tag
         env:
           GH_TOKEN: ${{ github.token }}
@@ -32,6 +40,15 @@ jobs:
           else
             gh release create "${{ github.ref_name }}" --title "${{ github.ref_name }}" --draft --notes-from-tag
           fi
+      - name: Create and upload PIE pre-packaged source
+        env:
+          GH_TOKEN: ${{ github.token }}
+          EXT_NAME: ${{ steps.metadata.outputs.extension-name }}
+          RELEASE_VERSION: ${{ steps.metadata.outputs.version }}
+        run: |
+          SRC_ARCHIVE_PATH="${RUNNER_TEMP}/php_${EXT_NAME}-${GITHUB_REF_NAME}-src.tgz"
+          git archive --format="tar.gz" --prefix="${EXT_NAME}-${RELEASE_VERSION}/" --output "${SRC_ARCHIVE_PATH}" HEAD
+          gh release upload "${GITHUB_REF_NAME}" "${SRC_ARCHIVE_PATH}" --clobber
   BuildDebPackages:
     needs: [ CreateDraftRelease ]
     runs-on: ${{ matrix.runs-on }}
@@ -101,80 +118,92 @@ jobs:
           path: artifacts/*
           if-no-files-found: error
           retention-days: 1
-  AddPieBinaries:
+  BuildPieLinux:
     needs: [ CreateDraftRelease ]
-    runs-on: ${{ matrix.operating-system }}
+    runs-on: ${{ matrix.runs-on }}
+    env:
+      PSKEL_BUILD_TARGET: builder
+    permissions:
+      contents: write
     strategy:
       fail-fast: false
       matrix:
-        operating-system:
-          - ubuntu-latest
-          - macos-latest
-        php-versions:
-          - '8.1'
-          - '8.2'
-          - '8.3'
-          - '8.4'
-          - '8.5'
-        zts-mode:
-          - ts
-          - nts
+        runs-on: ['ubuntu-24.04', 'ubuntu-24.04-arm']
+        version: ['8.1', '8.2', '8.3', '8.4', '8.5']
+        ts: ['cli', 'zts']
+        distro: ['trixie', 'alpine']
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+      - name: Build PIE pre-packaged binary
+        env:
+          EXT_NAME: ${{ needs.CreateDraftRelease.outputs.extension_name }}
+        run: |
+          docker compose build \
+            --build-arg TAG="${{ matrix.version }}-${{ matrix.ts }}-${{ matrix.distro }}" \
+            shell
+          mkdir -p "dist"
+          docker compose run \
+            --no-deps \
+            -v "$(pwd)/dist:/dist" \
+            -e EXT_CONFIGURE_OPTS="--enable-${EXT_NAME}" \
+            --rm shell pskel package "${GITHUB_REF_NAME}" /dist "${EXT_NAME}"
+      - name: Upload PIE pre-packaged binary to the release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release upload "${GITHUB_REF_NAME}" dist/*.zip --clobber
+  BuildPieMacos:
+    needs: [ CreateDraftRelease ]
+    runs-on: ${{ matrix.runs-on }}
     permissions:
       contents: write
+    strategy:
+      fail-fast: false
+      matrix:
+        runs-on: ['macos-15', 'macos-15-intel']
+        version: ['8.1', '8.2', '8.3', '8.4', '8.5']
+        ts: ['ts', 'nts']
     steps:
       - name: Checkout
         uses: actions/checkout@v7
       - name: Setup PHP
         uses: shivammathur/setup-php@f3e473d116dcccaddc5834248c87452386958240 # 2.37.2
         with:
-          php-version: ${{ matrix.php-versions }}
+          php-version: ${{ matrix.version }}
+          extensions: none
         env:
-          phpts: ${{ matrix.zts-mode }}
-      - name: Build and release
-        uses: php/pie-ext-binary-builder@5298761950f63c7e9565ed7004e922b346e4386c # 0.0.3
-        with:
-          release-tag: ${{ github.ref_name }}
-          github-token: ${{ secrets.GITHUB_TOKEN }}
-          configure-flags: '--enable-colopl_bc'
-          build-path: 'ext'
-  GetWindowsExtensionMatrix:
-    needs: [ CreateDraftRelease ]
-    runs-on: ubuntu-latest
-    outputs:
-      matrix: ${{ steps.extension-matrix.outputs.matrix }}
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v7
-        with:
-          fetch-depth: 1
-      - name: Get the extension matrix
-        id: extension-matrix
-        uses: php/php-windows-builder/extension-matrix@e03e5d39879adaeb61ed2225f0f4eae7db8c1df8 # 1.8.1
-        with:
-          php-version-list: '8.1,8.2,8.3,8.4,8.5'
+          phpts: ${{ matrix.ts }}
+      - name: Build and upload PIE pre-packaged binary
+        env:
+          GH_TOKEN: ${{ github.token }}
+          EXT_NAME: ${{ needs.CreateDraftRelease.outputs.extension_name }}
+        run: |
+          mkdir -p "dist"
+          EXT_CONFIGURE_OPTS="--enable-${EXT_NAME}" ./pskel.sh package "${GITHUB_REF_NAME}" "dist" "${EXT_NAME}"
+          gh release upload "${GITHUB_REF_NAME}" dist/*.zip --clobber
   BuildWindows:
-    needs: GetWindowsExtensionMatrix
-    runs-on: ${{ matrix.os }}
+    needs: [ CreateDraftRelease ]
+    runs-on: windows-2025
     strategy:
       fail-fast: false
-      matrix: ${{ fromJson(needs.GetWindowsExtensionMatrix.outputs.matrix) }}
+      matrix:
+        version: ['8.1', '8.2', '8.3', '8.4', '8.5']
+        arch: ['x64', 'x86']
+        ts: ['ts', 'nts']
     steps:
       - name: Checkout
         uses: actions/checkout@v7
-        with:
-          fetch-depth: 1
-      # Workaround: php-windows-builder reads config.w32 from repo root,
-      # but our extension source is in ext/. Copy ext/* to root so the
-      # action can find config.w32 and the source files.
-      - name: Copy extension source to root
+      - name: Stage extension source for Windows builder
         shell: pwsh
-        run: Copy-Item -Path ext\* -Destination . -Recurse -Force
+        run: |
+          Get-ChildItem -LiteralPath .\ext -Force | Copy-Item -Destination . -Recurse -Force
       - name: Build the extension
-        uses: php/php-windows-builder/extension@e03e5d39879adaeb61ed2225f0f4eae7db8c1df8 # 1.8.1
+        uses: php/php-windows-builder/extension@29352c0ef9e8ce65264ea9e287881a6f7758a953 # 1.9.0
         with:
-          php-version: ${{ matrix.php-version }}
+          php-version: ${{ matrix.version }}
           arch: ${{ matrix.arch }}
           ts: ${{ matrix.ts }}
+          args: --enable-${{ needs.CreateDraftRelease.outputs.extension_name }}
   ReleaseWindows:
     runs-on: ubuntu-latest
     needs: BuildWindows
@@ -182,7 +211,7 @@ jobs:
       contents: write
     steps:
       - name: Upload artifact to the release
-        uses: php/php-windows-builder/release@e03e5d39879adaeb61ed2225f0f4eae7db8c1df8 # 1.8.1
+        uses: php/php-windows-builder/release@29352c0ef9e8ce65264ea9e287881a6f7758a953 # 1.9.0
         with:
           release: ${{ github.ref_name }}
           token: ${{ secrets.GITHUB_TOKEN }}
@@ -203,7 +232,7 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: gh release upload "${{ github.ref_name }}" deb-artifacts/* --clobber --repo "${{ github.repository }}"
   PublishRelease:
-    needs: [ AddPieBinaries, ReleaseWindows, ReleaseDebPackages ]
+    needs: [ BuildPieLinux, BuildPieMacos, ReleaseWindows, ReleaseDebPackages ]
     runs-on: ubuntu-latest
     permissions:
       contents: write

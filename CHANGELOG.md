@@ -1,3 +1,6 @@
+# 13.2.3
+- Add `colopl_bc.security.isolate_unserialize` INI directive (default: `1`), which runs `unserialize()` with `serialize_lock` held so that nested calls started from destructors never share the outer call's back-reference / delayed-call state
+
 # 13.2.2
 - Add `colopl_bc.security.lock_session_serialize_handler` INI directive (default: `0`), which narrows `session.serialize_handler` to `PHP_INI_SYSTEM` so that the session decoding format cannot be changed per directory or at run time (handler-mismatch object injection)
 

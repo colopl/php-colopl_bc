@@ -22,6 +22,25 @@
 
 #include "php_colopl_bc_security.h"
 
+#if COLOPL_BC_SECURITY_SESSION_UPLOAD_PROGRESS_HARDENING_SUPPORTED
+/* Only the types are used: the session globals are reached through the module
+ * entry, so there is no link-time dependency on (a possibly shared) ext/session. */
+# include "ext/session/php_session.h"
+# if PHP_VERSION_ID >= 70000
+#  include "zend_smart_str.h"
+# else
+#  include "ext/standard/php_smart_str.h"
+# endif
+#endif
+
+/* TSRMLS_* are empty since PHP 7.0 and were removed in PHP 8.0. */
+#ifndef TSRMLS_DC
+# define TSRMLS_D	void
+# define TSRMLS_DC
+# define TSRMLS_C
+# define TSRMLS_CC
+#endif
+
 /*
  * Security backport: session.upload_progress
  *
@@ -44,9 +63,442 @@ static int colopl_bc_security_sup_requested = 0;	/* INI value */
 static int colopl_bc_security_sup_applied = 0;		/* hook detached by us */
 static int colopl_bc_security_sup_had_callback = 0;	/* a hook was registered when we detached it */
 
+/*
+ * Security backport: session.upload_progress cached pointers
+ *
+ * php_session_rfc1867_callback() (ext/session/session.c) keeps raw zval
+ * pointers into the progress array it exports to $_SESSION:
+ *
+ *   post_bytes_processed         -> data["bytes_processed"]
+ *   files                        -> data["files"]          (not refcounted)
+ *   current_file                 -> data["files"][n]       (not refcounted)
+ *   current_file_bytes_processed -> data["files"][n]["bytes_processed"]
+ *
+ * and writes through them on every FILE_DATA / FILE_END / END event. They are
+ * only resolved once (per upload, resp. per file) while the array is shared with
+ * the session and torn down / separated by every update() cycle, so they can be
+ * left pointing at a copy that is no longer the one exported: on PHP 7.2+,
+ * MULTIPART_EVENT_END with session.upload_progress.cleanup=0 separates `data`
+ * and then stores the final byte count through the old pointer, i.e. into the
+ * copy that the following update() frees.
+ *
+ * The hardening wraps the hook installed by ext/session and, before each event
+ * that dereferences the cached pointers, rebinds all of them to the array tree
+ * the progress record owns (`data`, which is always refcounted). On END with
+ * cleanup=0 it separates `data` first, so ext/session's own SEPARATE_ARRAY() is
+ * a no-op and the final store lands in the array that is saved. If the tree does
+ * not have the layout ext/session builds, progress tracking is dropped for that
+ * upload (the progress key is released) instead of following any cached pointer.
+ *
+ * The wrapper never changes the event, its data or the return value, and it
+ * keeps calling the next hook in the chain for every event. On valid input the
+ * rebound pointers are the ones ext/session already holds, so the only
+ * observable difference is that, with cleanup=0, the final bytes_processed is
+ * the total that was read (as on PHP 5.4 - 7.1) instead of a stale value.
+ *
+ * The same wrapper also closes two logic gaps of the hook that public PoC code
+ * relies on, without affecting requests that work today: with
+ * session.use_only_cookies=1 a session ID form field is not taken for the
+ * progress record (session_start() does not take it either), and a progress
+ * key that the "php" serializer cannot encode is not tracked (it would make
+ * every update() save the session as an empty string).
+ *
+ * The record layout (php_session_rfc1867_progress, php_ps_globals) is taken from
+ * the headers of the PHP release this extension is built against. A build can be
+ * loaded into a later release of the same branch, so the wrapper is only
+ * installed when the running PHP_VERSION_ID is affected as well and the size of
+ * the session globals matches.
+ */
+
+#if COLOPL_BC_SECURITY_SESSION_UPLOAD_PROGRESS_HARDENING_SUPPORTED
+# define COLOPL_BC_SECURITY_SUPH_INI_DEFAULT "1"
+#else
+# define COLOPL_BC_SECURITY_SUPH_INI_DEFAULT "0"
+#endif
+
+static int colopl_bc_security_suph_requested = 0;	/* INI value */
+static int colopl_bc_security_suph_applied = 0;		/* hook wrapped by us */
+static const char *colopl_bc_security_suph_state = "inactive (disabled by INI)";
+
+#if COLOPL_BC_SECURITY_SESSION_UPLOAD_PROGRESS_HARDENING_SUPPORTED
+
+# if PHP_VERSION_ID >= 80300
+typedef zend_result colopl_bc_security_rfc1867_result;
+# else
+typedef int colopl_bc_security_rfc1867_result;
+# endif
+
+typedef colopl_bc_security_rfc1867_result (*colopl_bc_security_rfc1867_callback)(unsigned int event, void *event_data, void **extra TSRMLS_DC);
+
+static colopl_bc_security_rfc1867_callback colopl_bc_security_suph_next = NULL;
+
+/* Resolved at MINIT and read-only afterwards. */
+# ifdef ZTS
+static ts_rsrc_id colopl_bc_security_suph_ps_id = 0;
+#  define COLOPL_BC_SECURITY_PS_GLOBALS() ((php_ps_globals *) ts_resource(colopl_bc_security_suph_ps_id))
+# else
+static php_ps_globals *colopl_bc_security_suph_ps = NULL;
+#  define COLOPL_BC_SECURITY_PS_GLOBALS() (colopl_bc_security_suph_ps)
+# endif
+
+/* The running PHP still has CVE-2020-7062 (see colopl_bc_security_suph_callback()). */
+static int colopl_bc_security_suph_null_data_guard = 0;
+
+# if PHP_VERSION_ID >= 70000
+
+/* Same conditions ext/session checks before touching the progress record. */
+#  define COLOPL_BC_SECURITY_SUPH_HAS_KEY(progress) \
+	(Z_TYPE((progress)->sid) && (progress)->key.s)
+#  define COLOPL_BC_SECURITY_SUPH_HAS_DATA(progress) \
+	(Z_TYPE((progress)->data) == IS_ARRAY)
+
+/* Returns 0 when the tree does not have the layout ext/session builds. */
+static int colopl_bc_security_suph_rebind(php_session_rfc1867_progress *progress)
+{
+	zval *bytes, *files, *current_file, *current_bytes;
+
+	bytes = zend_hash_str_find(Z_ARRVAL(progress->data), "bytes_processed", sizeof("bytes_processed") - 1);
+	if (!bytes || Z_TYPE_P(bytes) != IS_LONG) {
+		return 0;
+	}
+	files = zend_hash_str_find(Z_ARRVAL(progress->data), "files", sizeof("files") - 1);
+	if (!files || Z_TYPE_P(files) != IS_ARRAY || Z_ARRVAL_P(files)->nNextFreeElement < 1) {
+		return 0;
+	}
+	/* current_file is always the element add_next_index_zval() appended last. */
+	current_file = zend_hash_index_find(Z_ARRVAL_P(files), Z_ARRVAL_P(files)->nNextFreeElement - 1);
+	if (!current_file || Z_TYPE_P(current_file) != IS_ARRAY) {
+		return 0;
+	}
+	current_bytes = zend_hash_str_find(Z_ARRVAL_P(current_file), "bytes_processed", sizeof("bytes_processed") - 1);
+	if (!current_bytes || Z_TYPE_P(current_bytes) != IS_LONG) {
+		return 0;
+	}
+
+	progress->post_bytes_processed = bytes;
+	ZVAL_COPY_VALUE(&progress->files, files);
+	ZVAL_COPY_VALUE(&progress->current_file, current_file);
+	progress->current_file_bytes_processed = current_bytes;
+
+	return 1;
+}
+
+# else	/* PHP_VERSION_ID >= 70000 */
+
+/* PHP 5: the progress record holds zval pointers (sid is inline), the tree owns them. */
+#  define COLOPL_BC_SECURITY_SUPH_HAS_KEY(progress) \
+	(Z_TYPE((progress)->sid) && (progress)->key.c)
+#  define COLOPL_BC_SECURITY_SUPH_HAS_DATA(progress) \
+	((progress)->data && Z_TYPE_P((progress)->data) == IS_ARRAY)
+
+static int colopl_bc_security_suph_rebind(php_session_rfc1867_progress *progress)
+{
+	zval **bytes, **files, **current_file, **current_bytes;
+
+	if (zend_hash_find(Z_ARRVAL_P(progress->data), "bytes_processed", sizeof("bytes_processed"), (void **) &bytes) != SUCCESS
+		|| Z_TYPE_PP(bytes) != IS_LONG
+	) {
+		return 0;
+	}
+	if (zend_hash_find(Z_ARRVAL_P(progress->data), "files", sizeof("files"), (void **) &files) != SUCCESS
+		|| Z_TYPE_PP(files) != IS_ARRAY
+		|| Z_ARRVAL_PP(files)->nNextFreeElement == 0
+	) {
+		return 0;
+	}
+	/* current_file is always the element add_next_index_zval() appended last. */
+	if (zend_hash_index_find(Z_ARRVAL_PP(files), Z_ARRVAL_PP(files)->nNextFreeElement - 1, (void **) &current_file) != SUCCESS
+		|| Z_TYPE_PP(current_file) != IS_ARRAY
+	) {
+		return 0;
+	}
+	if (zend_hash_find(Z_ARRVAL_PP(current_file), "bytes_processed", sizeof("bytes_processed"), (void **) &current_bytes) != SUCCESS
+		|| Z_TYPE_PP(current_bytes) != IS_LONG
+	) {
+		return 0;
+	}
+
+	progress->post_bytes_processed = *bytes;
+	progress->files = *files;
+	progress->current_file = *current_file;
+	progress->current_file_bytes_processed = *current_bytes;
+
+	return 1;
+}
+
+# endif	/* PHP_VERSION_ID >= 70000 */
+
+/* php_session_encode() with the "php" serializer fails for a key containing
+ * PS_DELIMITER, and before PHP 7.2 also PS_UNDEF_MARKER (ext/session/session.c). */
+# if PHP_VERSION_ID < 70200
+#  define COLOPL_BC_SECURITY_SUPH_PHP_SERIALIZER_REJECTED "|!"
+# else
+#  define COLOPL_BC_SECURITY_SUPH_PHP_SERIALIZER_REJECTED "|"
+# endif
+
+static int colopl_bc_security_suph_key_encodable(const php_ps_globals *ps, const php_session_rfc1867_progress *progress)
+{
+	const char *key, *c;
+	size_t key_len;
+
+	if (!ps->serializer || !ps->serializer->name || strcmp(ps->serializer->name, "php") != 0) {
+		return 1;
+	}
+# if PHP_VERSION_ID >= 70000
+	key = ZSTR_VAL(progress->key.s);
+	key_len = ZSTR_LEN(progress->key.s);
+# else
+	key = progress->key.c;
+	key_len = progress->key.len;
+# endif
+	for (c = COLOPL_BC_SECURITY_SUPH_PHP_SERIALIZER_REJECTED; *c; c++) {
+		if (memchr(key, *c, key_len)) {
+			return 0;
+		}
+	}
+
+	return 1;
+}
+
+/*
+ * ext/session takes the session ID for the progress record from a form field
+ * named after the session even with session.use_only_cookies=1, which
+ * session_start() never does. With use_only_cookies=1 the record keeps the ID
+ * it had before that field (none, or the cookie found when the progress key
+ * arrived); the field itself still reaches $_POST.
+ */
+# if PHP_VERSION_ID >= 80500
+/* PS(session_name) is a zend_string since PHP 8.5. */
+#  define COLOPL_BC_SECURITY_SUPH_IS_SESSION_NAME(ps, name) \
+	((ps)->session_name && zend_string_equals_cstr((ps)->session_name, (name), strlen(name)))
+# else
+#  define COLOPL_BC_SECURITY_SUPH_IS_SESSION_NAME(ps, name) \
+	((ps)->session_name && strcmp((name), (ps)->session_name) == 0)
+# endif
+
+static colopl_bc_security_rfc1867_result colopl_bc_security_suph_formdata(void *event_data, void **extra TSRMLS_DC)
+{
+	php_ps_globals *ps = COLOPL_BC_SECURITY_PS_GLOBALS();
+	multipart_event_formdata *data = (multipart_event_formdata *) event_data;
+	php_session_rfc1867_progress *progress = ps->rfc1867_enabled ? ps->rfc1867_progress : NULL;
+	colopl_bc_security_rfc1867_result result;
+	zval sid;
+
+	if (!progress || !ps->use_only_cookies || !data->name || !COLOPL_BC_SECURITY_SUPH_IS_SESSION_NAME(ps, data->name)) {
+		return colopl_bc_security_suph_next(MULTIPART_EVENT_FORMDATA, event_data, extra TSRMLS_CC);
+	}
+
+# if PHP_VERSION_ID >= 70000
+	ZVAL_COPY(&sid, &progress->sid);
+	result = colopl_bc_security_suph_next(MULTIPART_EVENT_FORMDATA, event_data, extra TSRMLS_CC);
+	zval_ptr_dtor(&progress->sid);
+	ZVAL_COPY_VALUE(&progress->sid, &sid);
+# else
+	sid = progress->sid;
+	zval_copy_ctor(&sid);
+	result = colopl_bc_security_suph_next(MULTIPART_EVENT_FORMDATA, event_data, extra TSRMLS_CC);
+	zval_dtor(&progress->sid);
+	progress->sid = sid;
+# endif
+
+	return result;
+}
+
+static colopl_bc_security_rfc1867_result colopl_bc_security_suph_callback(unsigned int event, void *event_data, void **extra TSRMLS_DC)
+{
+	php_ps_globals *ps;
+	php_session_rfc1867_progress *progress;
+
+	switch (event) {
+		case MULTIPART_EVENT_FORMDATA:
+			return colopl_bc_security_suph_formdata(event_data, extra TSRMLS_CC);
+		case MULTIPART_EVENT_FILE_START:
+		case MULTIPART_EVENT_FILE_DATA:
+		case MULTIPART_EVENT_FILE_END:
+		case MULTIPART_EVENT_END:
+			ps = COLOPL_BC_SECURITY_PS_GLOBALS();
+			/* Same guard as ext/session: PS(rfc1867_progress) belongs to the body
+			 * being parsed only while the feature is enabled (it is not reset when
+			 * a request bails out). It is allocated by MULTIPART_EVENT_START. */
+			if (!ps->rfc1867_enabled) {
+				break;
+			}
+			progress = ps->rfc1867_progress;
+			if (!progress || !COLOPL_BC_SECURITY_SUPH_HAS_KEY(progress)) {
+				break;
+			}
+			if (!COLOPL_BC_SECURITY_SUPH_HAS_DATA(progress)) {
+				/* No FILE_START has been processed yet, so php_rinit_session() has
+				 * not run for this body: releasing the key here makes ext/session
+				 * skip the upload without leaving anything to clean up. */
+				if (event == MULTIPART_EVENT_FILE_START && !colopl_bc_security_suph_key_encodable(ps, progress)) {
+					/* php_session_encode() would fail on every update(), and the
+					 * session is then saved as an empty string, wiping the data
+					 * stored under that ID. Such a key cannot be tracked anyway. */
+					smart_str_free(&progress->key);
+				} else if (event == MULTIPART_EVENT_END && !ps->rfc1867_cleanup && colopl_bc_security_suph_null_data_guard) {
+					/* CVE-2020-7062 (bug #79221): with cleanup=0, END stores into the
+					 * progress array without checking that it exists (NULL / IS_UNDEF
+					 * dereference) before 7.2.28 / 7.3.15 / 7.4.3, which skip that store. */
+					smart_str_free(&progress->key);
+				}
+				break;
+			}
+# if PHP_VERSION_ID >= 70000
+			if (event == MULTIPART_EVENT_END && !ps->rfc1867_cleanup) {
+				SEPARATE_ARRAY(&progress->data);
+			}
+# endif
+			if (!colopl_bc_security_suph_rebind(progress)) {
+				/* Not reachable with the tree ext/session builds. ext/session skips
+				 * every event without a key, including the END clean-up, so the
+				 * session state php_rinit_session() set up for this body is left to
+				 * the request shutdown (debug builds report it as a leak). */
+				smart_str_free(&progress->key);
+			}
+			break;
+		default:
+			break;
+	}
+
+	return colopl_bc_security_suph_next(event, event_data, extra TSRMLS_CC);
+}
+
+static long colopl_bc_security_runtime_version_id(TSRMLS_D)
+{
+	long version_id = 0;
+# if PHP_VERSION_ID >= 70000
+	zval *constant = zend_get_constant_str("PHP_VERSION_ID", sizeof("PHP_VERSION_ID") - 1);
+
+	if (constant && Z_TYPE_P(constant) == IS_LONG) {
+		version_id = (long) Z_LVAL_P(constant);
+	}
+# else
+	zval constant;
+
+	if (zend_get_constant("PHP_VERSION_ID", sizeof("PHP_VERSION_ID") - 1, &constant TSRMLS_CC)) {
+		if (Z_TYPE(constant) == IS_LONG) {
+			version_id = Z_LVAL(constant);
+		}
+		zval_dtor(&constant);
+	}
+# endif
+
+	return version_id;
+}
+
+static zend_module_entry *colopl_bc_security_find_session_module(TSRMLS_D)
+{
+# if PHP_VERSION_ID >= 70000
+	return zend_hash_str_find_ptr(&module_registry, "session", sizeof("session") - 1);
+# else
+	zend_module_entry *module;
+
+	if (zend_hash_find(&module_registry, "session", sizeof("session"), (void **) &module) != SUCCESS) {
+		return NULL;
+	}
+	return module;
+# endif
+}
+
+#endif	/* COLOPL_BC_SECURITY_SESSION_UPLOAD_PROGRESS_HARDENING_SUPPORTED */
+
 PHP_INI_BEGIN()
 	PHP_INI_ENTRY(COLOPL_BC_SECURITY_INI_DISABLE_SESSION_UPLOAD_PROGRESS, "0", PHP_INI_SYSTEM, NULL)
+	PHP_INI_ENTRY(COLOPL_BC_SECURITY_INI_HARDEN_SESSION_UPLOAD_PROGRESS, COLOPL_BC_SECURITY_SUPH_INI_DEFAULT, PHP_INI_SYSTEM, NULL)
 PHP_INI_END()
+
+int colopl_bc_security_session_upload_progress_is_hardened(void)
+{
+	return colopl_bc_security_suph_applied;
+}
+
+static void colopl_bc_security_session_upload_progress_harden(TSRMLS_D)
+{
+#if COLOPL_BC_SECURITY_SESSION_UPLOAD_PROGRESS_HARDENING_SUPPORTED
+	zend_module_entry *session;
+	long version_id;
+
+	if (!colopl_bc_security_suph_requested) {
+		colopl_bc_security_suph_state = "inactive (disabled by INI)";
+		return;
+	}
+	if (colopl_bc_security_sup_applied) {
+		colopl_bc_security_suph_state = "inactive (session.upload_progress hook detached)";
+		return;
+	}
+	session = colopl_bc_security_find_session_module(TSRMLS_C);
+	if (!session) {
+		colopl_bc_security_suph_state = "inactive (session extension not loaded)";
+		return;
+	}
+	if (php_rfc1867_callback == NULL) {
+		colopl_bc_security_suph_state = "inactive (no php_rfc1867_callback was registered)";
+		return;
+	}
+	if (session->globals_size != sizeof(php_ps_globals)
+# ifdef ZTS
+		|| !session->globals_id_ptr
+# else
+		|| !session->globals_ptr
+# endif
+	) {
+		colopl_bc_security_suph_state = "inactive (session globals layout mismatch)";
+		return;
+	}
+	version_id = colopl_bc_security_runtime_version_id(TSRMLS_C);
+	if (version_id <= 0 || !COLOPL_BC_SECURITY_SESSION_UPLOAD_PROGRESS_POINTERS_AFFECTED(version_id)) {
+		colopl_bc_security_suph_state = "inactive (not applicable to the running PHP version)";
+		return;
+	}
+
+# ifdef ZTS
+	colopl_bc_security_suph_ps_id = *session->globals_id_ptr;
+# else
+	colopl_bc_security_suph_ps = (php_ps_globals *) session->globals_ptr;
+# endif
+	colopl_bc_security_suph_null_data_guard = COLOPL_BC_SECURITY_SESSION_UPLOAD_PROGRESS_NULL_DATA_AFFECTED(version_id) ? 1 : 0;
+	colopl_bc_security_suph_next = php_rfc1867_callback;
+	php_rfc1867_callback = colopl_bc_security_suph_callback;
+	colopl_bc_security_suph_applied = 1;
+	colopl_bc_security_suph_state = "active (php_rfc1867_callback wrapped)";
+#else
+	colopl_bc_security_suph_state = "inactive (not applicable to this PHP version)";
+#endif
+}
+
+static void colopl_bc_security_session_upload_progress_unharden(void)
+{
+#if COLOPL_BC_SECURITY_SESSION_UPLOAD_PROGRESS_HARDENING_SUPPORTED
+	if (!colopl_bc_security_suph_applied) {
+		return;
+	}
+
+	/* Hand the chain back before this module is unloaded; ext/session's MSHUTDOWN
+	 * (which runs after ours) only clears the hook when it is its own callback.
+	 * A hook installed after ours is expected to restore ours on its MSHUTDOWN. */
+	if (php_rfc1867_callback == colopl_bc_security_suph_callback) {
+		php_rfc1867_callback = colopl_bc_security_suph_next;
+	}
+	colopl_bc_security_suph_next = NULL;
+	colopl_bc_security_suph_null_data_guard = 0;
+	colopl_bc_security_suph_applied = 0;
+#endif
+}
+
+static const char *colopl_bc_security_session_upload_progress_null_data_state(void)
+{
+#if COLOPL_BC_SECURITY_SESSION_UPLOAD_PROGRESS_HARDENING_SUPPORTED
+	if (!colopl_bc_security_suph_applied) {
+		return "inactive (pointer hardening is inactive)";
+	}
+	return colopl_bc_security_suph_null_data_guard
+		? "active"
+		: "inactive (fixed in the running PHP version)";
+#else
+	return "inactive (not applicable to this PHP version)";
+#endif
+}
 
 int colopl_bc_security_session_upload_progress_is_disabled(void)
 {
@@ -60,8 +512,8 @@ static void colopl_bc_security_session_upload_progress_apply(void)
 		return;
 	}
 
-	/* The hook type differs across PHP versions (TSRMLS_DC, int vs zend_result),
-	 * so it is never stored; we only remember whether one was registered.
+	/* The detached hook is never called again, so it is not stored; we only
+	 * remember whether one was registered.
 	 * NULL when ext/session is not loaded: nothing to detach, but stay "applied"
 	 * so that a hook registered later cannot be reached either. */
 	colopl_bc_security_sup_had_callback = php_rfc1867_callback != NULL;
@@ -74,8 +526,15 @@ static void colopl_bc_security_session_upload_progress_apply(void)
  * No restore on MSHUTDOWN: ext/session's MSHUTDOWN only clears the hook when it
  * still points at its own callback, so the end state is NULL either way, and a
  * subsequent MINIT cycle (e.g. a graceful restart of a threaded SAPI) re-registers
- * ext/session before this module detaches it again.
+ * ext/session before this module detaches it again. The bookkeeping is reset so
+ * that this also holds when the module is not unloaded in between (static builds,
+ * ZEND_DONT_UNLOAD_MODULES).
  */
+static void colopl_bc_security_session_upload_progress_reset(void)
+{
+	colopl_bc_security_sup_applied = 0;
+	colopl_bc_security_sup_had_callback = 0;
+}
 
 int colopl_bc_security_minit(INIT_FUNC_ARGS)
 {
@@ -84,11 +543,18 @@ int colopl_bc_security_minit(INIT_FUNC_ARGS)
 	colopl_bc_security_sup_requested = INI_BOOL(COLOPL_BC_SECURITY_INI_DISABLE_SESSION_UPLOAD_PROGRESS) ? 1 : 0;
 	colopl_bc_security_session_upload_progress_apply();
 
+	/* After the detach: there is nothing to harden once the hook is gone. */
+	colopl_bc_security_suph_requested = INI_BOOL(COLOPL_BC_SECURITY_INI_HARDEN_SESSION_UPLOAD_PROGRESS) ? 1 : 0;
+	colopl_bc_security_session_upload_progress_harden(TSRMLS_C);
+
 	return SUCCESS;
 }
 
 int colopl_bc_security_mshutdown(SHUTDOWN_FUNC_ARGS)
 {
+	colopl_bc_security_session_upload_progress_unharden();
+	colopl_bc_security_session_upload_progress_reset();
+
 	UNREGISTER_INI_ENTRIES();
 
 	return SUCCESS;
@@ -114,5 +580,8 @@ void colopl_bc_security_minfo(ZEND_MODULE_INFO_FUNC_ARGS)
 	php_info_print_table_header(2, "colopl_bc security backports", "enabled");
 	php_info_print_table_row(2, "session.upload_progress hook mitigation", state);
 	php_info_print_table_row(2, COLOPL_BC_SECURITY_INI_DISABLE_SESSION_UPLOAD_PROGRESS, colopl_bc_security_sup_requested ? "1" : "0");
+	php_info_print_table_row(2, "session.upload_progress pointer hardening", colopl_bc_security_suph_state);
+	php_info_print_table_row(2, "session.upload_progress CVE-2020-7062 guard", colopl_bc_security_session_upload_progress_null_data_state());
+	php_info_print_table_row(2, COLOPL_BC_SECURITY_INI_HARDEN_SESSION_UPLOAD_PROGRESS, colopl_bc_security_suph_requested ? "1" : "0");
 	php_info_print_table_end();
 }

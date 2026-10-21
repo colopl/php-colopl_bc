@@ -37,13 +37,13 @@ This extension provides, by default on affected versions: the state reset at the
 Read this before deciding that a host is covered. On an unfixed PHP build with this extension loaded, the following remain:
 
 1. **Code runs before RINIT when the session is decoded.** The upstream fix decodes the session without resolving classes. An extension cannot do that, so objects stored in the session are instantiated before RINIT and their (internal-class) `__wakeup` / `__unserialize` run on uninitialized request state; `unserialize_callback_func`, if configured, is called as well. Reachable when an attacker can put objects into a session that gets decoded (serialize-handler mismatch, an application that stores attacker-controlled serialized data in the session, a known session ID).
-2. **Out-of-memory during the request itself.** The engine-wide bailout replacement cannot be provided by an extension. The state reset only protects the *next* multipart request on the same process (mod_php, LiteSpeed); everything else the upstream fix made OOM-safe (hash tables, strings, JSON, mbstring, streams, ...) is unchanged.
+2. **Out-of-memory during script execution, on every SAPI.** The upstream fix replaces the `memory_limit` bailout (`longjmp()`) engine-wide because a request that is cut off while a structure is allocated but not yet initialized leaves that structure behind, and the request shutdown then reads it (the fix adds tests for `array_fill()`, `array_pad()`, `SplFixedArray`, date interval parsing, SOAP, `getimagesizefromstring()`, stream copies, unfinished call frames, ...). An extension cannot provide this. It is independent of `session.upload_progress` and of the SAPI: after such a fatal error a php-fpm worker keeps serving requests, so an attacker can retry against the same process. What this extension's state reset protects is only the *next multipart request* after a bailout *during request startup* (the session path) on SAPIs that keep the process alive after a startup failure (mod_php, LiteSpeed); php-fpm and CGI end the worker in that case. Reaching the execution-time path needs an application code path where attacker input drives the memory use up to `memory_limit` inside one of the affected operations; nothing in this extension changes that.
 3. **URL rewriter (`session.use_trans_sid`) state** is not reset at the start of the body; the upstream fix resets it with a new internal function.
 4. **Memory exhaustion by multipart headers / parts** is not limited (the upstream fix de-duplicates headers and checks `post_max_size` early). Limit it at the web server (`LimitRequestBody`, `client_max_body_size`) and with `post_max_size` / `max_multipart_body_parts`.
 5. **The wrapper is only installed when the running PHP matches the headers the extension was built against** (version range and `php_ps_globals` size). Distribution patches, a build reused on another release, ZTS or Windows (untested) can leave it `inactive` without any error. `php -i | grep "pointer hardening"` must say `active`; otherwise none of the session mitigations apply.
 6. **`unserialize()` of untrusted input in the application** is object injection regardless of this extension; `colopl_bc.security.isolate_unserialize` only removes one memory-safety primitive from it.
 
-The one setting that closes 1 - 4 on an unfixed build is `colopl_bc.security.disable_session_upload_progress=1` (or `session.upload_progress.enabled=0`), at the cost of the upload progress feature. It does not close 2 for code paths outside the session handler, and it does not close 6.
+The one setting that closes 1, 3 and 4 and the session half of 2 on an unfixed build is `colopl_bc.security.disable_session_upload_progress=1` (or `session.upload_progress.enabled=0`), at the cost of the upload progress feature. Nothing in this extension closes the execution-time half of 2 or 6; only the PHP upgrade does.
 
 What to do:
 
@@ -86,13 +86,13 @@ upstream の修正は 2 本立てです。(1) エンジン全体で、OOM 時の
 ホストが保護されていると判断する前に必ず読んでください。未修正の PHP に本拡張を読み込んでも、以下は残ります。
 
 1. **セッション復号時に RINIT 前でコードが走る。** upstream はクラス解決なしで復号しますが、拡張にはできません。セッションに保存されたオブジェクトは RINIT 前に復元され、(内部クラスの) `__wakeup` / `__unserialize` が未初期化のリクエスト状態の上で走ります。`unserialize_callback_func` が設定されていればそれも呼ばれます。攻撃者が復号対象のセッションにオブジェクトを置ける場合 (serialize handler の不一致、攻撃者制御のシリアライズ値をセッションに書くアプリ、既知のセッション ID) に到達します。
-2. **リクエスト自身の中での OOM。** エンジン全体の bailout 置き換えは拡張では提供できません。状態リセットが守るのは同じプロセス (mod_php、LiteSpeed) の *次の* multipart リクエストだけで、upstream が OOM 安全にしたその他すべて (ハッシュテーブル、文字列、JSON、mbstring、ストリーム等) は未修正のままです。
+2. **スクリプト実行中の OOM (すべての SAPI)。** upstream が `memory_limit` 超過時の bailout (`longjmp()`) をエンジン全体で置き換えたのは、構造を確保して初期化し切る前に打ち切られたリクエストがその構造を残し、リクエスト終了処理がそれを読むためです (修正は `array_fill()`、`array_pad()`、`SplFixedArray`、日付間隔の解析、SOAP、`getimagesizefromstring()`、ストリームのコピー、未完了の呼び出しフレームなどのテストを追加しています)。これは拡張では提供できません。`session.upload_progress` とも SAPI とも無関係で、この fatal の後も php-fpm のワーカーは生き続けるため、攻撃者は同じプロセスに対して何度でも試行できます。本拡張の状態リセットが守るのは、*リクエスト起動中* (セッション経路) の bailout の後、起動失敗後もプロセスを生かす SAPI (mod_php、LiteSpeed) で *次の multipart リクエスト* が stale な状態を使うことだけです (php-fpm と CGI は起動失敗時にワーカーを終了します)。実行中の経路に到達するには、攻撃者の入力で影響を受ける処理の中のメモリ使用量を `memory_limit` まで押し上げられるアプリケーション側のコードが必要ですが、本拡張はそこに何の影響も与えません。
 3. **URL 書き換え (`session.use_trans_sid`) の状態**は本文開始時にリセットされません (upstream は新設の内部関数でリセットしています)。
 4. **multipart のヘッダ・パート数によるメモリ枯渇**は制限しません (upstream はヘッダの重複排除と `post_max_size` の早期チェックを追加)。Web サーバ側 (`LimitRequestBody`、`client_max_body_size`) と `post_max_size` / `max_multipart_body_parts` で制限してください。
 5. **ラッパは、実行中の PHP がビルド時のヘッダと一致する場合にだけ組み込まれます** (バージョン範囲と `php_ps_globals` のサイズ)。ディストリビューションの独自パッチ、別リリースへのビルドの流用、ZTS や Windows (未検証) では、エラーなしに `inactive` になり得ます。`php -i | grep "pointer hardening"` が `active` でなければ、セッション関連の緩和はどれも効いていません。
 6. **アプリケーションが信頼できない入力を `unserialize()` すること**は、本拡張の有無にかかわらずオブジェクト注入です。`colopl_bc.security.isolate_unserialize` はそこからメモリ安全性のプリミティブを 1 つ取り除くだけです。
 
-未修正ビルドで 1 - 4 を閉じる唯一の設定は `colopl_bc.security.disable_session_upload_progress=1` (または `session.upload_progress.enabled=0`) で、代わりにアップロード進捗機能を失います。これでもセッションハンドラ以外の経路の 2 と、6 は閉じません。
+未修正ビルドで 1、3、4 と 2 のセッション側を閉じる唯一の設定は `colopl_bc.security.disable_session_upload_progress=1` (または `session.upload_progress.enabled=0`) で、代わりにアップロード進捗機能を失います。2 の実行中の経路と 6 は本拡張では閉じられず、PHP の更新でしか解決しません。
 
 対応手順:
 

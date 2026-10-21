@@ -403,9 +403,95 @@ static zend_module_entry *colopl_bc_security_find_session_module(TSRMLS_D)
 
 #endif	/* COLOPL_BC_SECURITY_SESSION_UPLOAD_PROGRESS_HARDENING_SUPPORTED */
 
+/*
+ * Security backport: session.serialize_handler lock
+ *
+ * session.serialize_handler is PHP_INI_ALL, so the format a session file is
+ * decoded with can be switched per directory (.user.ini, .htaccess) or at run
+ * time (ini_set(), session_start() options). Decoding data that was written by
+ * one handler with another is an object-injection primitive ("handler
+ * mismatch"). This mitigation narrows the directive to PHP_INI_SYSTEM in the
+ * engine's INI registry after ext/session has registered it, so only php.ini
+ * and the SAPI configuration (php_admin_value, -d) decide the handler; every
+ * later change is refused by the engine, exactly as for any other
+ * PHP_INI_SYSTEM directive.
+ *
+ * Feature-disabling for deployments that rely on per-directory handlers,
+ * therefore opt-in (default 0). The value itself is never changed.
+ */
+
+static int colopl_bc_security_ssh_requested = 0;	/* INI value */
+static int colopl_bc_security_ssh_applied = 0;		/* modifiable narrowed by us */
+static int colopl_bc_security_ssh_orig_modifiable = 0;
+
+#define COLOPL_BC_SECURITY_SSH_DIRECTIVE "session.serialize_handler"
+
+static zend_ini_entry *colopl_bc_security_ssh_find_entry(TSRMLS_D)
+{
+#if PHP_VERSION_ID >= 70000
+	return zend_hash_str_find_ptr(EG(ini_directives), COLOPL_BC_SECURITY_SSH_DIRECTIVE, sizeof(COLOPL_BC_SECURITY_SSH_DIRECTIVE) - 1);
+#else
+	zend_ini_entry *entry;
+
+	if (zend_hash_find(EG(ini_directives), COLOPL_BC_SECURITY_SSH_DIRECTIVE, sizeof(COLOPL_BC_SECURITY_SSH_DIRECTIVE), (void **) &entry) == SUCCESS) {
+		return entry;
+	}
+	return NULL;
+#endif
+}
+
+int colopl_bc_security_session_serialize_handler_is_locked(void)
+{
+	return colopl_bc_security_ssh_applied;
+}
+
+/* MINIT: runs after ext/session's MINIT (module dependency), i.e. after the directive exists. */
+static void colopl_bc_security_session_serialize_handler_lock(TSRMLS_D)
+{
+	zend_ini_entry *entry;
+
+	if (!colopl_bc_security_ssh_requested || colopl_bc_security_ssh_applied) {
+		return;
+	}
+	entry = colopl_bc_security_ssh_find_entry(TSRMLS_C);
+	if (!entry) {
+		return;	/* ext/session is not loaded: nothing to lock */
+	}
+	colopl_bc_security_ssh_orig_modifiable = entry->modifiable;
+	entry->modifiable = PHP_INI_SYSTEM;
+	colopl_bc_security_ssh_applied = 1;
+}
+
+/* MSHUTDOWN: runs before ext/session's MSHUTDOWN, so the directive still exists. */
+static void colopl_bc_security_session_serialize_handler_unlock(TSRMLS_D)
+{
+	zend_ini_entry *entry;
+
+	if (!colopl_bc_security_ssh_applied) {
+		return;
+	}
+	entry = colopl_bc_security_ssh_find_entry(TSRMLS_C);
+	if (entry) {
+		entry->modifiable = colopl_bc_security_ssh_orig_modifiable;
+	}
+	colopl_bc_security_ssh_applied = 0;
+}
+
+static const char *colopl_bc_security_session_serialize_handler_state(void)
+{
+	if (colopl_bc_security_ssh_applied) {
+		return "active (session.serialize_handler is PHP_INI_SYSTEM)";
+	}
+	if (colopl_bc_security_ssh_requested) {
+		return "inactive (session.serialize_handler is not registered)";
+	}
+	return "inactive (disabled by INI)";
+}
+
 PHP_INI_BEGIN()
 	PHP_INI_ENTRY(COLOPL_BC_SECURITY_INI_DISABLE_SESSION_UPLOAD_PROGRESS, "0", PHP_INI_SYSTEM, NULL)
 	PHP_INI_ENTRY(COLOPL_BC_SECURITY_INI_HARDEN_SESSION_UPLOAD_PROGRESS, COLOPL_BC_SECURITY_SUPH_INI_DEFAULT, PHP_INI_SYSTEM, NULL)
+	PHP_INI_ENTRY(COLOPL_BC_SECURITY_INI_LOCK_SESSION_SERIALIZE_HANDLER, "0", PHP_INI_SYSTEM, NULL)
 PHP_INI_END()
 
 int colopl_bc_security_session_upload_progress_is_hardened(void)
@@ -547,11 +633,15 @@ int colopl_bc_security_minit(INIT_FUNC_ARGS)
 	colopl_bc_security_suph_requested = INI_BOOL(COLOPL_BC_SECURITY_INI_HARDEN_SESSION_UPLOAD_PROGRESS) ? 1 : 0;
 	colopl_bc_security_session_upload_progress_harden(TSRMLS_C);
 
+	colopl_bc_security_ssh_requested = INI_BOOL(COLOPL_BC_SECURITY_INI_LOCK_SESSION_SERIALIZE_HANDLER) ? 1 : 0;
+	colopl_bc_security_session_serialize_handler_lock(TSRMLS_C);
+
 	return SUCCESS;
 }
 
 int colopl_bc_security_mshutdown(SHUTDOWN_FUNC_ARGS)
 {
+	colopl_bc_security_session_serialize_handler_unlock(TSRMLS_C);
 	colopl_bc_security_session_upload_progress_unharden();
 	colopl_bc_security_session_upload_progress_reset();
 
@@ -583,5 +673,7 @@ void colopl_bc_security_minfo(ZEND_MODULE_INFO_FUNC_ARGS)
 	php_info_print_table_row(2, "session.upload_progress pointer hardening", colopl_bc_security_suph_state);
 	php_info_print_table_row(2, "session.upload_progress CVE-2020-7062 guard", colopl_bc_security_session_upload_progress_null_data_state());
 	php_info_print_table_row(2, COLOPL_BC_SECURITY_INI_HARDEN_SESSION_UPLOAD_PROGRESS, colopl_bc_security_suph_requested ? "1" : "0");
+	php_info_print_table_row(2, "session.serialize_handler lock", colopl_bc_security_session_serialize_handler_state());
+	php_info_print_table_row(2, COLOPL_BC_SECURITY_INI_LOCK_SESSION_SERIALIZE_HANDLER, colopl_bc_security_ssh_requested ? "1" : "0");
 	php_info_print_table_end();
 }

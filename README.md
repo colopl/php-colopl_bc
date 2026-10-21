@@ -164,6 +164,15 @@ The wrapper also closes two logic gaps of the hook that public proof-of-concept 
 
 Affected PHP versions (compiled in and enabled by default): PHP <= 8.1 (every release), PHP 8.2 <= 8.2.34, PHP 8.3 <= 8.3.36, PHP 8.4 <= 8.4.28, PHP 8.5 <= 8.5.13. On other versions the mitigation is not compiled in and the directive defaults to `0`. Because the callback's data layout is taken from the PHP headers used at build time, the wrapper is also only installed when the *running* PHP version is affected and the session globals match those headers; otherwise `phpinfo()` reports it as `inactive` with the reason. It is not installed when `colopl_bc.security.disable_session_upload_progress=1` has already detached the hook.
 
+### `colopl_bc.security.lock_session_serialize_handler` (default: `0`)
+
+Narrows `session.serialize_handler` from `PHP_INI_ALL` to `PHP_INI_SYSTEM` in the engine's INI registry, after `ext/session` has registered it. The format a session file is decoded with can then only be chosen in `php.ini` or the SAPI configuration (`php_admin_value`, `-d`); `.user.ini`, `.htaccess`, `ini_set()` and `session_start()` options are refused by the engine, exactly as for any other `PHP_INI_SYSTEM` directive. Decoding session data that was written by one handler with another ("handler mismatch") is an object-injection primitive, which this removes for everything below the server configuration.
+
+- `0`: not applied. `session.serialize_handler` stays `PHP_INI_ALL`.
+- `1`: applied. The current value is kept; only its changeability is reduced. `ini_get_all('session', true)['session.serialize_handler']['access']` reports `4`.
+
+This is an opt-in, feature-disabling mitigation: deployments that switch the handler per directory or per request keep working only with `0`. Applies to every PHP version (5.4+); when `ext/session` is not loaded there is nothing to lock and `phpinfo()` reports it as `inactive`.
+
 ## API references
 
 ### INI directives

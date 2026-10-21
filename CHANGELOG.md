@@ -1,3 +1,8 @@
+# 13.4.0
+- Add `colopl_bc.security.abort_on_memory_error` INI directive (default: `1`): a `memory_limit` / out-of-memory fatal error ends the process (`_exit(255)` after the usual logging) instead of bailing out with `longjmp()`, so that neither the request shutdown nor a later request of the same process can read the state the interrupted code left behind (the class fixed engine-wide by the 2026-10-21 PHP security release). Shutdown functions, destructors, the session write and temporary upload files of that request are not processed
+- Add `colopl_bc.security.abort_on_timeout` INI directive (default: `1`): the `max_execution_time` fatal error ends the process the same way
+- README: the memory-error and timeout bailouts are now listed as mitigated; other fatal errors remain bailouts
+
 # 13.3.0
 - Align the `session.upload_progress` mitigations with the 2026-10-21 PHP security release (GHSA-w8hw-w9fx-j79w / GHSA-6wmf-4rv5-p3rp, CVE-2026-109618 / CVE-2026-109619, fixed in PHP 8.2.35 / 8.3.36 / 8.4.27 / 8.5.12):
   - The affected-version ranges now end at those releases; on fixed builds the pointer hardening is not compiled in

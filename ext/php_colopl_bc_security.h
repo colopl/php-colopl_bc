@@ -88,6 +88,8 @@
 #define COLOPL_BC_SECURITY_INI_HARDEN_SESSION_UPLOAD_PROGRESS "colopl_bc.security.harden_session_upload_progress"
 #define COLOPL_BC_SECURITY_INI_LOCK_SESSION_SERIALIZE_HANDLER "colopl_bc.security.lock_session_serialize_handler"
 #define COLOPL_BC_SECURITY_INI_ISOLATE_UNSERIALIZE "colopl_bc.security.isolate_unserialize"
+#define COLOPL_BC_SECURITY_INI_ABORT_ON_MEMORY_ERROR "colopl_bc.security.abort_on_memory_error"
+#define COLOPL_BC_SECURITY_INI_ABORT_ON_TIMEOUT "colopl_bc.security.abort_on_timeout"
 
 /*
  * TODO(secfix): once the upstream fix for the unserialize() nested-state issue
@@ -111,5 +113,11 @@ int colopl_bc_security_session_serialize_handler_is_locked(void);
 
 /* Whether unserialize() is currently wrapped so that nested calls never share its state. */
 int colopl_bc_security_unserialize_is_isolated(void);
+
+/* Whether a memory_limit / out-of-memory fatal error currently ends the process instead of bailing out. */
+int colopl_bc_security_abort_on_memory_error_is_active(void);
+
+/* Whether a max_execution_time fatal error currently ends the process instead of bailing out. */
+int colopl_bc_security_abort_on_timeout_is_active(void);
 
 #endif	/* PHP_COLOPL_BC_SECURITY_H */

@@ -16,10 +16,16 @@
 #endif
 
 #include "php.h"
+#ifdef PHP_WIN32
+# include <process.h>
+#else
+# include <unistd.h>
+#endif
 #include "php_ini.h"
 #include "ext/standard/info.h"
 #include "rfc1867.h"
 #include "ext/standard/basic_functions.h"
+#include "SAPI.h"
 
 #include "php_colopl_bc_security.h"
 
@@ -671,11 +677,181 @@ static const char *colopl_bc_security_unserialize_state(void)
 	return "inactive (unserialize() is not registered)";
 }
 
+/*
+ * Security backport: end the process on memory errors instead of bailing out
+ *
+ * When an allocation exceeds memory_limit (or the system is out of memory),
+ * the allocator raises an E_ERROR and then unwinds with zend_bailout(), a
+ * longjmp() out of whatever was running. Before the 2026-10-21 security
+ * release (php-src 01a40e89 "Avoid state corruption via bailout",
+ * CVE-2026-109618 / CVE-2026-109619) that leaves behind whatever the
+ * interrupted code had allocated but not yet initialized, and the request
+ * shutdown, or the next request of the same process when the bailout hit
+ * request startup, then reads it. The fix replaces the bailout by an
+ * unwinding exit throughout the engine, which an extension cannot do.
+ *
+ * What an extension can do is to not let the process continue: every memory
+ * error passes through zend_error_cb before the bailout, so a replacement
+ * callback that logs the error as usual and then ends the process with
+ * _exit() leaves nothing for a shutdown or a later request to read. The SAPI
+ * replaces the worker (php-fpm, Apache prefork); the client gets a dropped
+ * connection instead of a 500. Shutdown functions, session writes, output
+ * buffers and temporary upload files of that request are not processed.
+ *
+ * max_execution_time is the other bailout that interrupts arbitrary code
+ * (zend_timeout(): before PHP 7.1 straight from the signal handler, since then
+ * at the next VM interrupt check, but still in the middle of whatever internal
+ * function was running); abort_on_timeout applies the same treatment to it.
+ */
+
+#if PHP_VERSION_ID >= 80100
+typedef void (*colopl_bc_security_error_cb_t)(int type, zend_string *error_filename, const uint32_t error_lineno, zend_string *message);
+#elif PHP_VERSION_ID >= 80000
+typedef void (*colopl_bc_security_error_cb_t)(int type, const char *error_filename, const uint32_t error_lineno, zend_string *message);
+#else
+typedef void (*colopl_bc_security_error_cb_t)(int type, const char *error_filename, const unsigned int error_lineno, const char *format, va_list args);
+#endif
+
+static int colopl_bc_security_aome_requested = 0;	/* INI value: memory errors */
+static int colopl_bc_security_aot_requested = 0;	/* INI value: timeouts */
+static int colopl_bc_security_aome_applied = 0;		/* zend_error_cb replaced by us */
+static colopl_bc_security_error_cb_t colopl_bc_security_aome_orig = NULL;
+
+int colopl_bc_security_abort_on_memory_error_is_active(void)
+{
+	return colopl_bc_security_aome_applied && colopl_bc_security_aome_requested;
+}
+
+int colopl_bc_security_abort_on_timeout_is_active(void)
+{
+	return colopl_bc_security_aome_applied && colopl_bc_security_aot_requested;
+}
+
+/* The two messages zend_mm_safe_error() raises (Zend/zend_alloc.c) and the one
+ * zend_timeout() raises (Zend/zend_execute_API.c), every version. */
+static int colopl_bc_security_is_abort_error(int type, const char *message)
+{
+#ifdef E_DONT_BAIL
+	type &= ~E_DONT_BAIL;
+#endif
+#ifdef E_ALL
+	type &= E_ALL;
+#endif
+	if (type != E_ERROR || !message) {
+		return 0;
+	}
+	if (colopl_bc_security_aome_requested
+		&& (strncmp(message, "Allowed memory size of", sizeof("Allowed memory size of") - 1) == 0
+			|| strncmp(message, "Out of memory", sizeof("Out of memory") - 1) == 0)) {
+		return 1;
+	}
+	if (colopl_bc_security_aot_requested
+		&& strncmp(message, "Maximum execution time of", sizeof("Maximum execution time of") - 1) == 0) {
+		return 1;
+	}
+	return 0;
+}
+
+#if PHP_VERSION_ID >= 80100
+static void colopl_bc_security_error_cb(int type, zend_string *error_filename, const uint32_t error_lineno, zend_string *message)
+{
+	if (!colopl_bc_security_is_abort_error(type, ZSTR_VAL(message))) {
+		colopl_bc_security_aome_orig(type, error_filename, error_lineno, message);
+		return;
+	}
+	/* Log and display as usual, but without the bailout php_error_cb() does for E_ERROR. */
+	colopl_bc_security_aome_orig(type | E_DONT_BAIL, error_filename, error_lineno, message);
+	sapi_flush();
+	fflush(NULL);
+	_exit(255);
+}
+#elif PHP_VERSION_ID >= 80000
+static void colopl_bc_security_error_cb(int type, const char *error_filename, const uint32_t error_lineno, zend_string *message)
+{
+	if (!colopl_bc_security_is_abort_error(type, ZSTR_VAL(message))) {
+		colopl_bc_security_aome_orig(type, error_filename, error_lineno, message);
+		return;
+	}
+	colopl_bc_security_aome_orig(type | E_DONT_BAIL, error_filename, error_lineno, message);
+	sapi_flush();
+	fflush(NULL);
+	_exit(255);
+}
+#else
+static void colopl_bc_security_error_cb(int type, const char *error_filename, const unsigned int error_lineno, const char *format, va_list args)
+{
+	TSRMLS_FETCH();
+
+	if (!colopl_bc_security_is_abort_error(type, format)) {
+		colopl_bc_security_aome_orig(type, error_filename, error_lineno, format, args);
+		return;
+	}
+# ifdef E_DONT_BAIL
+	colopl_bc_security_aome_orig(type | E_DONT_BAIL, error_filename, error_lineno, format, args);
+# else
+	/* Before E_DONT_BAIL (PHP 7.4): php_error_cb() always bails out for E_ERROR,
+	 * so log and display it ourselves, in php_error_cb()'s formats. */
+	{
+		char *message, *line;
+		const char *file = error_filename ? error_filename : "Unknown";
+
+		vspprintf(&message, 0, format, args);
+		if (PG(log_errors)) {
+			spprintf(&line, 0, "PHP Fatal error:  %s in %s on line %u", message, file, error_lineno);
+			php_log_err(line TSRMLS_CC);
+			efree(line);
+		}
+		if (PG(display_errors)) {
+			php_printf("%s\nFatal error: %s in %s on line %u\n%s", PG(html_errors) ? "<br />" : "", message, file, error_lineno, PG(html_errors) ? "<br />\n" : "");
+		}
+		efree(message);
+	}
+# endif
+	sapi_flush(TSRMLS_C);
+	fflush(NULL);
+	_exit(255);
+}
+#endif
+
+static void colopl_bc_security_abort_on_memory_error_apply(void)
+{
+	if ((!colopl_bc_security_aome_requested && !colopl_bc_security_aot_requested) || colopl_bc_security_aome_applied) {
+		return;
+	}
+	colopl_bc_security_aome_orig = zend_error_cb;
+	zend_error_cb = colopl_bc_security_error_cb;
+	colopl_bc_security_aome_applied = 1;
+}
+
+static void colopl_bc_security_abort_on_memory_error_restore(void)
+{
+	if (!colopl_bc_security_aome_applied) {
+		return;
+	}
+	if (zend_error_cb == colopl_bc_security_error_cb) {
+		zend_error_cb = colopl_bc_security_aome_orig;
+	}
+	colopl_bc_security_aome_orig = NULL;
+	colopl_bc_security_aome_applied = 0;
+}
+
+static const char *colopl_bc_security_abort_state(int requested)
+{
+	if (colopl_bc_security_aome_applied && requested) {
+		return zend_error_cb == colopl_bc_security_error_cb
+			? "active (zend_error_cb wrapped)"
+			: "active (zend_error_cb wrapped, another extension chained after it)";
+	}
+	return "inactive (disabled by INI)";
+}
+
 PHP_INI_BEGIN()
 	PHP_INI_ENTRY(COLOPL_BC_SECURITY_INI_DISABLE_SESSION_UPLOAD_PROGRESS, "0", PHP_INI_SYSTEM, NULL)
 	PHP_INI_ENTRY(COLOPL_BC_SECURITY_INI_HARDEN_SESSION_UPLOAD_PROGRESS, COLOPL_BC_SECURITY_SUPH_INI_DEFAULT, PHP_INI_SYSTEM, NULL)
 	PHP_INI_ENTRY(COLOPL_BC_SECURITY_INI_LOCK_SESSION_SERIALIZE_HANDLER, "0", PHP_INI_SYSTEM, NULL)
 	PHP_INI_ENTRY(COLOPL_BC_SECURITY_INI_ISOLATE_UNSERIALIZE, "1", PHP_INI_SYSTEM, NULL)
+	PHP_INI_ENTRY(COLOPL_BC_SECURITY_INI_ABORT_ON_MEMORY_ERROR, "1", PHP_INI_SYSTEM, NULL)
+	PHP_INI_ENTRY(COLOPL_BC_SECURITY_INI_ABORT_ON_TIMEOUT, "1", PHP_INI_SYSTEM, NULL)
 PHP_INI_END()
 
 int colopl_bc_security_session_upload_progress_is_hardened(void)
@@ -823,11 +999,16 @@ int colopl_bc_security_minit(INIT_FUNC_ARGS)
 	colopl_bc_security_unser_requested = INI_BOOL(COLOPL_BC_SECURITY_INI_ISOLATE_UNSERIALIZE) ? 1 : 0;
 	colopl_bc_security_unserialize_isolate(TSRMLS_C);
 
+	colopl_bc_security_aome_requested = INI_BOOL(COLOPL_BC_SECURITY_INI_ABORT_ON_MEMORY_ERROR) ? 1 : 0;
+	colopl_bc_security_aot_requested = INI_BOOL(COLOPL_BC_SECURITY_INI_ABORT_ON_TIMEOUT) ? 1 : 0;
+	colopl_bc_security_abort_on_memory_error_apply();
+
 	return SUCCESS;
 }
 
 int colopl_bc_security_mshutdown(SHUTDOWN_FUNC_ARGS)
 {
+	colopl_bc_security_abort_on_memory_error_restore();
 	colopl_bc_security_unserialize_restore(TSRMLS_C);
 	colopl_bc_security_session_serialize_handler_unlock(TSRMLS_C);
 	colopl_bc_security_session_upload_progress_unharden();
@@ -865,5 +1046,9 @@ void colopl_bc_security_minfo(ZEND_MODULE_INFO_FUNC_ARGS)
 	php_info_print_table_row(2, COLOPL_BC_SECURITY_INI_LOCK_SESSION_SERIALIZE_HANDLER, colopl_bc_security_ssh_requested ? "1" : "0");
 	php_info_print_table_row(2, "unserialize() nested-state isolation", colopl_bc_security_unserialize_state());
 	php_info_print_table_row(2, COLOPL_BC_SECURITY_INI_ISOLATE_UNSERIALIZE, colopl_bc_security_unser_requested ? "1" : "0");
+	php_info_print_table_row(2, "memory error process abort", colopl_bc_security_abort_state(colopl_bc_security_aome_requested));
+	php_info_print_table_row(2, COLOPL_BC_SECURITY_INI_ABORT_ON_MEMORY_ERROR, colopl_bc_security_aome_requested ? "1" : "0");
+	php_info_print_table_row(2, "execution timeout process abort", colopl_bc_security_abort_state(colopl_bc_security_aot_requested));
+	php_info_print_table_row(2, COLOPL_BC_SECURITY_INI_ABORT_ON_TIMEOUT, colopl_bc_security_aot_requested ? "1" : "0");
 	php_info_print_table_end();
 }

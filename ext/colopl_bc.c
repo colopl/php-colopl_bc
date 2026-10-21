@@ -20,6 +20,55 @@
 #include "ext/standard/info.h"
 
 #include "php_colopl_bc.h"
+
+/* MINIT must run after ext/session so that the security backports can detach
+ * the hooks it registers. Optional: the extension still loads without session. */
+static const zend_module_dep colopl_bc_deps[] = {
+	ZEND_MOD_OPTIONAL("session")
+	ZEND_MOD_END
+};
+
+#ifdef COLOPL_BC_SECURITY_ONLY
+
+/* "security only" build (PHP 5.4 - 7.3, 8.0): no compatibility layer, no globals. */
+
+PHP_MINIT_FUNCTION(colopl_bc)
+{
+	return colopl_bc_security_minit(INIT_FUNC_ARGS_PASSTHRU);
+}
+
+PHP_MSHUTDOWN_FUNCTION(colopl_bc)
+{
+	return colopl_bc_security_mshutdown(SHUTDOWN_FUNC_ARGS_PASSTHRU);
+}
+
+PHP_MINFO_FUNCTION(colopl_bc)
+{
+	php_info_print_table_start();
+	php_info_print_table_header(2, "colopl_bc support", "enabled (security backports only)");
+	php_info_print_table_row(2, "bc version", PHP_COLOPL_BC_VERSION);
+	php_info_print_table_end();
+
+	colopl_bc_security_minfo(ZEND_MODULE_INFO_FUNC_ARGS_PASSTHRU);
+}
+
+zend_module_entry colopl_bc_module_entry = {
+	STANDARD_MODULE_HEADER_EX,
+	NULL,
+	colopl_bc_deps,
+	"colopl_bc",
+	NULL,
+	PHP_MINIT(colopl_bc),
+	PHP_MSHUTDOWN(colopl_bc),
+	NULL,
+	NULL,
+	PHP_MINFO(colopl_bc),
+	PHP_COLOPL_BC_VERSION,
+	STANDARD_MODULE_PROPERTIES
+};
+
+#else	/* COLOPL_BC_SECURITY_ONLY */
+
 #if PHP_VERSION_ID < 80000
 # include "colopl_bc_legacy_arginfo.h"
 #else
@@ -41,11 +90,13 @@ PHP_MINIT_FUNCTION(colopl_bc)
 
 	register_colopl_bc_symbols(module_number);
 
-	return SUCCESS;
+	return colopl_bc_security_minit(INIT_FUNC_ARGS_PASSTHRU);
 }
 
 PHP_MSHUTDOWN_FUNCTION(colopl_bc)
 {
+	colopl_bc_security_mshutdown(SHUTDOWN_FUNC_ARGS_PASSTHRU);
+
 	UNREGISTER_INI_ENTRIES();
 
 	return SUCCESS;
@@ -66,6 +117,8 @@ PHP_MINFO_FUNCTION(colopl_bc)
 	php_info_print_table_header(2, "colopl_bc support", "enabled");
 	php_info_print_table_row(2, "bc version", PHP_COLOPL_BC_VERSION);
 	php_info_print_table_end();
+
+	colopl_bc_security_minfo(ZEND_MODULE_INFO_FUNC_ARGS_PASSTHRU);
 }
 
 PHP_GINIT_FUNCTION(colopl_bc)
@@ -80,7 +133,9 @@ PHP_GINIT_FUNCTION(colopl_bc)
 }
 
 zend_module_entry colopl_bc_module_entry = {
-	STANDARD_MODULE_HEADER,
+	STANDARD_MODULE_HEADER_EX,
+	NULL,
+	colopl_bc_deps,
 	"colopl_bc",
 	ext_functions,
 	PHP_MINIT(colopl_bc),
@@ -96,8 +151,10 @@ zend_module_entry colopl_bc_module_entry = {
 	STANDARD_MODULE_PROPERTIES_EX
 };
 
+#endif	/* COLOPL_BC_SECURITY_ONLY */
+
 #ifdef COMPILE_DL_COLOPL_BC
-# ifdef ZTS
+# if defined(ZTS) && PHP_VERSION_ID >= 70000
 ZEND_TSRMLS_CACHE_DEFINE()
 # endif
 ZEND_GET_MODULE(colopl_bc)

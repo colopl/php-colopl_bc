@@ -17,6 +17,8 @@
 
 #include "php_colopl_bc.h"
 
+#ifndef COLOPL_BC_SECURITY_ONLY
+
 #include "ext/date/php_date.h"
 #include "zend_bitset.h"
 
@@ -641,3 +643,5 @@ PHP_FUNCTION(Colopl_ColoplBc_Php70_date_create_immutable)
 	date = Z_PHPDATE_P(return_value);
 	date->time->us = 0;
 }
+
+#endif	/* !COLOPL_BC_SECURITY_ONLY */

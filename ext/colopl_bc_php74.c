@@ -19,6 +19,8 @@
 
 #include "php_colopl_bc.h"
 
+#ifndef COLOPL_BC_SECURITY_ONLY
+
 #include "ext/standard/php_array.h"
 #include "ext/standard/php_string.h"
 #include "zend_exceptions.h"
@@ -2881,3 +2883,5 @@ PHP_FUNCTION(Colopl_ColoplBc_Php74_spaceship)
 }
 
 #endif
+
+#endif	/* !COLOPL_BC_SECURITY_ONLY */

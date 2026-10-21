@@ -5,6 +5,7 @@ colopl_bc
 --INI--
 date.timezone=UTC
 --SKIPIF--
+<?php if (!function_exists('Colopl\\ColoplBc\\Php74\\eq')) die('skip compatibility layer is not built on this PHP (security-only build)'); ?>
 <?php
 if (PHP_INT_SIZE !== 8) die("skip this test is for 64bit platform only");
 if (PHP_OS_FAMILY === 'Windows') print 'skip Windows not supported';

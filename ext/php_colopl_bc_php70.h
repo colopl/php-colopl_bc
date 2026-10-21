@@ -16,6 +16,13 @@
 
 #include "php_colopl_bc.h"
 
+#ifndef COLOPL_BC_SECURITY_ONLY
+#endif	/* !COLOPL_BC_SECURITY_ONLY */
+
+#define PHP_COLOPL_BC_PHP70_H
+
+#include "php_colopl_bc.h"
+
 /* rand.c */
 
 PHPAPI void php_colopl_bc_srand(zend_long seed);

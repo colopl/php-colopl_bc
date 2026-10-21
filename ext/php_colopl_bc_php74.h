@@ -15,10 +15,14 @@
 
 #include "php_colopl_bc.h"
 
+#ifndef COLOPL_BC_SECURITY_ONLY
+
 PHPAPI PHP_INI_MH(OnUpdateCompareMode);
 PHPAPI PHP_INI_MH(OnUpdateSortMode);
 
 PHPAPI int php_colopl_bc_compare(zval *op1, zval *op2);
+
+#endif	/* !COLOPL_BC_SECURITY_ONLY */
 
 #define PHP_COLOPL_BC_PHP74_H
 #endif	/* PHP_COLOPL_BC_PHP74_H */

@@ -6,6 +6,7 @@ colopl_bc
 date.timezone=UTC
 error_log=
 --SKIPIF--
+<?php if (!function_exists('Colopl\\ColoplBc\\Php74\\eq')) die('skip compatibility layer is not built on this PHP (security-only build)'); ?>
 <?php if (PHP_VERSION_ID < 80000) die("skip PHP 8 compatibility diagnostics only"); ?>
 --FILE--
 <?php

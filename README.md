@@ -10,7 +10,7 @@ Provides various compatibility functions required for PHP (temporary) migration.
 > [!IMPORTANT]
 > Since **13.2.1**, loading this extension hardens the `session.upload_progress` handling of `ext/session` **by default** on affected PHP versions, including EOL releases that will not receive an upstream fix (PHP 5.4 - 8.1). No configuration change is needed.
 
-This relates to the PHP security release scheduled for 2026-10-21 (publicly reported as CVE-2026-109618 / CVE-2026-109619) and the proof-of-concept code published for it, which targets the zval pointers that the upload progress callback caches into its progress array. The extension rebinds those pointers before every multipart event so that they can never point at a stale copy, while keeping `session.upload_progress` functional. The upstream fix had not been published when this mitigation was written; it will be re-evaluated once it is.
+This relates to the PHP security release scheduled for 2026-10-21 (publicly reported as CVE-2026-109618 / CVE-2026-109619) and the proof-of-concept code published for it, which targets the zval pointers that the upload progress callback caches into its progress array. The extension rebinds those pointers before every multipart event so that they can never point at a stale copy, while keeping `session.upload_progress` functional. On PHP older than 7.2.28 / 7.3.15 / 7.4.3 it also prevents the crash of CVE-2020-7062 in the same code path. The upstream fix had not been published when this mitigation was written; it will be re-evaluated once it is.
 
 | PHP | `colopl_bc.security.harden_session_upload_progress` |
 |---|---|
@@ -34,7 +34,7 @@ Compatibility: upload progress entries are created and updated as before. The on
 > [!IMPORTANT]
 > **13.2.1** 以降、本拡張を読み込むと、影響を受ける PHP バージョンで `ext/session` の `session.upload_progress` 処理が **デフォルトで** 堅牢化されます。upstream の修正が提供されない EOL バージョン (PHP 5.4 - 8.1) も対象です。設定変更は不要です。
 
-2026-10-21 に予定されている PHP のセキュリティリリース (CVE-2026-109618 / CVE-2026-109619 として公に報じられているもの) と、それに対して公開された PoC に関する対応です。PoC は、アップロード進捗コールバックが進捗配列に対してキャッシュしている zval ポインタを標的にしています。本拡張は multipart の各イベントの直前にそれらのポインタを張り直し、古いコピーを指したままにならないようにします。`session.upload_progress` の機能はそのまま利用できます。本緩和の作成時点では upstream の修正は未公開のため、公開後に改めて評価します。
+2026-10-21 に予定されている PHP のセキュリティリリース (CVE-2026-109618 / CVE-2026-109619 として公に報じられているもの) と、それに対して公開された PoC に関する対応です。PoC は、アップロード進捗コールバックが進捗配列に対してキャッシュしている zval ポインタを標的にしています。本拡張は multipart の各イベントの直前にそれらのポインタを張り直し、古いコピーを指したままにならないようにします。`session.upload_progress` の機能はそのまま利用できます。また 7.2.28 / 7.3.15 / 7.4.3 より古い PHP では、同じ処理経路にある CVE-2020-7062 によるクラッシュも防ぎます。本緩和の作成時点では upstream の修正は未公開のため、公開後に改めて評価します。
 
 | PHP | `colopl_bc.security.harden_session_upload_progress` |
 |---|---|
@@ -138,6 +138,8 @@ Keeps `session.upload_progress` functional while removing the stale-pointer clas
 
 - `0`: not applied. `session.upload_progress` behaves as in the running PHP version.
 - `1`: applied. Upload progress entries are created and updated as before. The only observable difference is that with `session.upload_progress.cleanup=0` on PHP 7.2+ the final `bytes_processed` is the total that was read (as on PHP 5.4 - 7.1) instead of a stale value.
+
+When the running PHP is older than 7.2.28 / 7.3.15 / 7.4.3 (including every PHP 5.4 - 7.1 release), the wrapper also guards CVE-2020-7062 (bug #79221): with `cleanup=0`, a body that carries the session ID and the progress key but no file part makes `ext/session` store into a progress array that was never created at the end of the upload, which crashes the process. The guard makes `ext/session` skip that store, as the fixed releases do. `phpinfo()` reports it as `session.upload_progress CVE-2020-7062 guard`.
 
 Affected PHP versions (compiled in and enabled by default): PHP <= 8.1 (every release), PHP 8.2 <= 8.2.34, PHP 8.3 <= 8.3.36, PHP 8.4 <= 8.4.28, PHP 8.5 <= 8.5.13. On other versions the mitigation is not compiled in and the directive defaults to `0`. Because the callback's data layout is taken from the PHP headers used at build time, the wrapper is also only installed when the *running* PHP version is affected and the session globals match those headers; otherwise `phpinfo()` reports it as `inactive` with the reason. It is not installed when `colopl_bc.security.disable_session_upload_progress=1` has already detached the hook.
 

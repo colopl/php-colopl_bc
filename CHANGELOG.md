@@ -3,7 +3,9 @@
   - Enabled by default (`1`) on affected PHP versions: PHP <= 8.1 (every release), 8.2 <= 8.2.34, 8.3 <= 8.3.36, 8.4 <= 8.4.28, 8.5 <= 8.5.13; not compiled in (`0`) on other versions
   - Only installed when the running PHP version is affected as well and the session globals layout matches the headers the extension was built against
   - With `session.upload_progress.cleanup=0` on PHP 7.2+, the final `bytes_processed` is now the total that was read instead of a stale value
-- Report the hardening state in `phpinfo()`
+  - Also guards CVE-2020-7062 (bug #79221, crash at the end of an upload with `cleanup=0` and no file part) when the running PHP is older than 7.2.28 / 7.3.15 / 7.4.3
+- Report the hardening and CVE-2020-7062 guard state in `phpinfo()`
+- Fix `colopl_bc.security.disable_session_upload_progress` not being applied again on a subsequent MINIT when the module is not unloaded in between (static builds, `ZEND_DONT_UNLOAD_MODULES`)
 
 # 13.2.0
 - Add security backports (`ext/colopl_bc_security.c`), buildable on every PHP release since 5.4

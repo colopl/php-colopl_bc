@@ -128,16 +128,22 @@ static colopl_bc_security_rfc1867_callback colopl_bc_security_suph_next = NULL;
 /* Resolved at MINIT and read-only afterwards. */
 # ifdef ZTS
 static ts_rsrc_id colopl_bc_security_suph_ps_id = 0;
-#  define COLOPL_BC_SECURITY_PS(v) (((php_ps_globals *) ts_resource(colopl_bc_security_suph_ps_id))->v)
+#  define COLOPL_BC_SECURITY_PS_GLOBALS() ((php_ps_globals *) ts_resource(colopl_bc_security_suph_ps_id))
 # else
 static php_ps_globals *colopl_bc_security_suph_ps = NULL;
-#  define COLOPL_BC_SECURITY_PS(v) (colopl_bc_security_suph_ps->v)
+#  define COLOPL_BC_SECURITY_PS_GLOBALS() (colopl_bc_security_suph_ps)
 # endif
+
+/* The running PHP still has CVE-2020-7062 (see colopl_bc_security_suph_callback()). */
+static int colopl_bc_security_suph_null_data_guard = 0;
 
 # if PHP_VERSION_ID >= 70000
 
-#  define COLOPL_BC_SECURITY_SUPH_TRACKING(progress) \
-	(Z_TYPE((progress)->sid) && (progress)->key.s && Z_TYPE((progress)->data) == IS_ARRAY)
+/* Same conditions ext/session checks before touching the progress record. */
+#  define COLOPL_BC_SECURITY_SUPH_HAS_KEY(progress) \
+	(Z_TYPE((progress)->sid) && (progress)->key.s)
+#  define COLOPL_BC_SECURITY_SUPH_HAS_DATA(progress) \
+	(Z_TYPE((progress)->data) == IS_ARRAY)
 
 /* Returns 0 when the tree does not have the layout ext/session builds. */
 static int colopl_bc_security_suph_rebind(php_session_rfc1867_progress *progress)
@@ -172,9 +178,11 @@ static int colopl_bc_security_suph_rebind(php_session_rfc1867_progress *progress
 
 # else	/* PHP_VERSION_ID >= 70000 */
 
-/* PHP 5: the progress record holds zval pointers, the tree owns them. */
-#  define COLOPL_BC_SECURITY_SUPH_TRACKING(progress) \
-	(Z_TYPE((progress)->sid) && (progress)->key.c && (progress)->data && Z_TYPE_P((progress)->data) == IS_ARRAY)
+/* PHP 5: the progress record holds zval pointers (sid is inline), the tree owns them. */
+#  define COLOPL_BC_SECURITY_SUPH_HAS_KEY(progress) \
+	(Z_TYPE((progress)->sid) && (progress)->key.c)
+#  define COLOPL_BC_SECURITY_SUPH_HAS_DATA(progress) \
+	((progress)->data && Z_TYPE_P((progress)->data) == IS_ARRAY)
 
 static int colopl_bc_security_suph_rebind(php_session_rfc1867_progress *progress)
 {
@@ -215,6 +223,7 @@ static int colopl_bc_security_suph_rebind(php_session_rfc1867_progress *progress
 
 static colopl_bc_security_rfc1867_result colopl_bc_security_suph_callback(unsigned int event, void *event_data, void **extra TSRMLS_DC)
 {
+	php_ps_globals *ps;
 	php_session_rfc1867_progress *progress;
 
 	switch (event) {
@@ -222,23 +231,39 @@ static colopl_bc_security_rfc1867_result colopl_bc_security_suph_callback(unsign
 		case MULTIPART_EVENT_FILE_DATA:
 		case MULTIPART_EVENT_FILE_END:
 		case MULTIPART_EVENT_END:
+			ps = COLOPL_BC_SECURITY_PS_GLOBALS();
 			/* Same guard as ext/session: PS(rfc1867_progress) belongs to the body
 			 * being parsed only while the feature is enabled (it is not reset when
 			 * a request bails out). It is allocated by MULTIPART_EVENT_START. */
-			if (!COLOPL_BC_SECURITY_PS(rfc1867_enabled)) {
+			if (!ps->rfc1867_enabled) {
 				break;
 			}
-			progress = COLOPL_BC_SECURITY_PS(rfc1867_progress);
-			if (!progress || !COLOPL_BC_SECURITY_SUPH_TRACKING(progress)) {
+			progress = ps->rfc1867_progress;
+			if (!progress || !COLOPL_BC_SECURITY_SUPH_HAS_KEY(progress)) {
+				break;
+			}
+			if (!COLOPL_BC_SECURITY_SUPH_HAS_DATA(progress)) {
+				/* No FILE_START yet. CVE-2020-7062 (bug #79221): with cleanup=0, END
+				 * stores into the progress array without checking that it exists
+				 * (NULL / IS_UNDEF dereference) before 7.2.28 / 7.3.15 / 7.4.3, which
+				 * skip that store. Releasing the key makes ext/session skip it as well;
+				 * php_rinit_session() has not run for this body, so the END clean-up
+				 * that is skipped along with it has nothing to release. */
+				if (event == MULTIPART_EVENT_END && !ps->rfc1867_cleanup && colopl_bc_security_suph_null_data_guard) {
+					smart_str_free(&progress->key);
+				}
 				break;
 			}
 # if PHP_VERSION_ID >= 70000
-			if (event == MULTIPART_EVENT_END && !COLOPL_BC_SECURITY_PS(rfc1867_cleanup)) {
+			if (event == MULTIPART_EVENT_END && !ps->rfc1867_cleanup) {
 				SEPARATE_ARRAY(&progress->data);
 			}
 # endif
 			if (!colopl_bc_security_suph_rebind(progress)) {
-				/* ext/session skips every event (and the END clean-up) without a key. */
+				/* Not reachable with the tree ext/session builds. ext/session skips
+				 * every event without a key, including the END clean-up, so the
+				 * session state php_rinit_session() set up for this body is left to
+				 * the request shutdown (debug builds report it as a leak). */
 				smart_str_free(&progress->key);
 			}
 			break;
@@ -342,6 +367,7 @@ static void colopl_bc_security_session_upload_progress_harden(TSRMLS_D)
 # else
 	colopl_bc_security_suph_ps = (php_ps_globals *) session->globals_ptr;
 # endif
+	colopl_bc_security_suph_null_data_guard = COLOPL_BC_SECURITY_SESSION_UPLOAD_PROGRESS_NULL_DATA_AFFECTED(version_id) ? 1 : 0;
 	colopl_bc_security_suph_next = php_rfc1867_callback;
 	php_rfc1867_callback = colopl_bc_security_suph_callback;
 	colopl_bc_security_suph_applied = 1;
@@ -365,7 +391,22 @@ static void colopl_bc_security_session_upload_progress_unharden(void)
 		php_rfc1867_callback = colopl_bc_security_suph_next;
 	}
 	colopl_bc_security_suph_next = NULL;
+	colopl_bc_security_suph_null_data_guard = 0;
 	colopl_bc_security_suph_applied = 0;
+#endif
+}
+
+static const char *colopl_bc_security_session_upload_progress_null_data_state(void)
+{
+#if COLOPL_BC_SECURITY_SESSION_UPLOAD_PROGRESS_HARDENING_SUPPORTED
+	if (!colopl_bc_security_suph_applied) {
+		return "inactive (pointer hardening is inactive)";
+	}
+	return colopl_bc_security_suph_null_data_guard
+		? "active"
+		: "inactive (fixed in the running PHP version)";
+#else
+	return "inactive (not applicable to this PHP version)";
 #endif
 }
 
@@ -395,8 +436,15 @@ static void colopl_bc_security_session_upload_progress_apply(void)
  * No restore on MSHUTDOWN: ext/session's MSHUTDOWN only clears the hook when it
  * still points at its own callback, so the end state is NULL either way, and a
  * subsequent MINIT cycle (e.g. a graceful restart of a threaded SAPI) re-registers
- * ext/session before this module detaches it again.
+ * ext/session before this module detaches it again. The bookkeeping is reset so
+ * that this also holds when the module is not unloaded in between (static builds,
+ * ZEND_DONT_UNLOAD_MODULES).
  */
+static void colopl_bc_security_session_upload_progress_reset(void)
+{
+	colopl_bc_security_sup_applied = 0;
+	colopl_bc_security_sup_had_callback = 0;
+}
 
 int colopl_bc_security_minit(INIT_FUNC_ARGS)
 {
@@ -415,6 +463,7 @@ int colopl_bc_security_minit(INIT_FUNC_ARGS)
 int colopl_bc_security_mshutdown(SHUTDOWN_FUNC_ARGS)
 {
 	colopl_bc_security_session_upload_progress_unharden();
+	colopl_bc_security_session_upload_progress_reset();
 
 	UNREGISTER_INI_ENTRIES();
 
@@ -442,6 +491,7 @@ void colopl_bc_security_minfo(ZEND_MODULE_INFO_FUNC_ARGS)
 	php_info_print_table_row(2, "session.upload_progress hook mitigation", state);
 	php_info_print_table_row(2, COLOPL_BC_SECURITY_INI_DISABLE_SESSION_UPLOAD_PROGRESS, colopl_bc_security_sup_requested ? "1" : "0");
 	php_info_print_table_row(2, "session.upload_progress pointer hardening", colopl_bc_security_suph_state);
+	php_info_print_table_row(2, "session.upload_progress CVE-2020-7062 guard", colopl_bc_security_session_upload_progress_null_data_state());
 	php_info_print_table_row(2, COLOPL_BC_SECURITY_INI_HARDEN_SESSION_UPLOAD_PROGRESS, colopl_bc_security_suph_requested ? "1" : "0");
 	php_info_print_table_end();
 }

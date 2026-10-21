@@ -13,7 +13,9 @@ phpinfo(INFO_MODULES);
 $info = ob_get_clean();
 var_dump(strpos($info, 'session.upload_progress pointer hardening => inactive (disabled by INI)') !== false);
 var_dump(strpos($info, 'colopl_bc.security.harden_session_upload_progress => 0') !== false);
+var_dump(strpos($info, 'session.upload_progress CVE-2020-7062 guard => inactive (pointer hardening is inactive)') !== false);
 ?>
 --EXPECT--
+bool(true)
 bool(true)
 bool(true)

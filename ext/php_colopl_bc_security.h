@@ -63,6 +63,17 @@
 	((id) >= 80500 && (id) < 80600 && (id) <= 80513) \
 )
 
+/*
+ * CVE-2020-7062 (bug #79221): MULTIPART_EVENT_END with session.upload_progress.cleanup=0
+ * dereferences the progress array of an upload that never reached FILE_START.
+ * Fixed in 7.2.28, 7.3.15 and 7.4.3; every older release is affected.
+ */
+#define COLOPL_BC_SECURITY_SESSION_UPLOAD_PROGRESS_NULL_DATA_AFFECTED(id) ( \
+	(id) < 70228 || \
+	((id) >= 70300 && (id) < 70315) || \
+	((id) >= 70400 && (id) < 70403) \
+)
+
 /* Needs the ext/session headers (HAVE_PHP_SESSION: PHP was built with session, shared or not). */
 #if COLOPL_BC_SECURITY_HAVE_RFC1867_CALLBACK && defined(HAVE_PHP_SESSION) && \
 	COLOPL_BC_SECURITY_SESSION_UPLOAD_PROGRESS_POINTERS_AFFECTED(PHP_VERSION_ID)

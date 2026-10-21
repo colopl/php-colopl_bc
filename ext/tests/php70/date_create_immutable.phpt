@@ -4,6 +4,8 @@ Check for \Colopl\ColoplBc\Php70\date_create_immutable() function.
 colopl_bc
 --INI--
 date.timezone=UTC
+--SKIPIF--
+<?php if (!function_exists('Colopl\\ColoplBc\\Php74\\eq')) die('skip compatibility layer is not built on this PHP (security-only build)'); ?>
 --FILE--
 <?php
 

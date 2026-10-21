@@ -7,9 +7,12 @@ Provides various compatibility functions required for PHP (temporary) migration.
 
 ## Supported Versions
 
-- Extension: PHP == 7.4 or PHP >= 8.1, 8.5 >= PHP
+- Compatibility layer (`Colopl\ColoplBc\Php70`, `Colopl\ColoplBc\Php74`): PHP == 7.4 or PHP >= 8.1, 8.5 >= PHP
+- Security backports only: PHP >= 5.4 (every release that is not a compatibility-layer target, including PHP 8.0)
 
-PHP 8.0 is not supported. On PHP 7.4, the Extension provides the PHP 7.4 compatibility namespace as thin wrappers around the native PHP APIs.
+PHP 8.0 is not supported by the compatibility layer. On PHP 7.4, the Extension provides the PHP 7.4 compatibility namespace as thin wrappers around the native PHP APIs.
+
+On PHP versions outside the compatibility-layer targets the extension is built in "security only" mode: the compatibility functions and their INI directives are not compiled in, and `phpinfo()` reports `colopl_bc support => enabled (security backports only)`. See [Security backports](#security-backports).
 
 ## Usage
 
@@ -58,6 +61,28 @@ $ docker run --rm -e VERSION="x.y.z" -v "$(pwd)/artifacts:/tmp/artifacts" "colop
 ```
 
 This target produces `php8.4-colopl-bc_x.y.z_<arch>_ubuntu22.04_sury.deb`.
+
+## Security backports
+
+`ext/colopl_bc_security.c` carries mitigations for PHP security fixes that are not shipped for the PHP versions this extension targets (PHP 7.4, PHP 8.1 and older builds of supported branches). It is written against the lowest common denominator of the extension API and builds on every PHP release since 5.4, so it can also be loaded on PHP 5.x / 7.0 - 7.3 / 8.0 installations that cannot be upgraded immediately.
+
+Each mitigation is controlled by its own `PHP_INI_SYSTEM` directive (`colopl_bc.security.*`), so it can only be set from `php.ini` or the SAPI command line, never from `.user.ini`, `.htaccess` or `ini_set()`. `phpinfo()` reports whether each mitigation is `active` (applied to this process) or `inactive` (disabled by INI, or not applicable to the running PHP version).
+
+Default-value policy:
+
+- A mitigation that re-implements the upstream fix while keeping the feature functional is enabled by default (`1`) when it cannot change the behaviour of valid input.
+- A mitigation that can only work by disabling a feature is disabled by default (`0`) and must be opted in.
+
+### `colopl_bc.security.disable_session_upload_progress` (default: `0`)
+
+Detaches the `session.upload_progress` feature from the multipart/form-data parser by clearing the engine hook `php_rfc1867_callback` after `ext/session` has registered it (MINIT ordering is guaranteed through a module dependency on `session`).
+
+- `0`: not applied. `session.upload_progress` behaves as in the running PHP version.
+- `1`: applied. `$_SESSION` upload-progress entries are never created. File uploads themselves (`$_FILES`, `$_POST`) are not affected.
+
+This is an opt-in, feature-disabling mitigation: unlike `session.upload_progress.enabled=0` it is enforced in the engine and cannot be re-enabled per directory or at runtime. Note that the hook is shared with any other extension that chains into `php_rfc1867_callback` (for example PECL `uploadprogress`); those are detached as well.
+
+Applies to PHP >= 5.4 (where `session.upload_progress` exists). Once an upstream fix is published, the mitigation will become a no-op on fixed PHP builds.
 
 ## API references
 

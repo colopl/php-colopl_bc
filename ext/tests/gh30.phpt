@@ -4,6 +4,8 @@ Check for GitHub Issue #30 (date_create() to SEGV on 8.4)
 colopl_bc
 --INI--
 date.timezone=UTC
+--SKIPIF--
+<?php if (!function_exists('Colopl\\ColoplBc\\Php74\\eq')) die('skip compatibility layer is not built on this PHP (security-only build)'); ?>
 --FILE--
 <?php
 

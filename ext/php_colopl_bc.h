@@ -19,6 +19,24 @@
 
 #include "php.h"
 
+/*
+ * The compatibility layer (php70 / php74 namespaces) targets PHP 7.4 and
+ * PHP 8.1+ only. On every other PHP version since 5.4 the extension is built
+ * in "security only" mode: just the security backports are compiled in.
+ */
+#if PHP_VERSION_ID < 70400 || (PHP_VERSION_ID >= 80000 && PHP_VERSION_ID < 80100)
+# define COLOPL_BC_SECURITY_ONLY 1
+#endif
+
+#include "php_colopl_bc_security.h"
+
+#define PHP_COLOPL_BC_VERSION "13.2.0"
+
+extern zend_module_entry colopl_bc_module_entry;
+#define phpext_colopl_bc_ptr &colopl_bc_module_entry
+
+#ifndef COLOPL_BC_SECURITY_ONLY
+
 #if PHP_VERSION_ID < 80400
 #include "ext/standard/php_lcg.h"
 #else
@@ -28,9 +46,6 @@
 #include "php_colopl_bc_php70.h"
 #include "php_colopl_bc_php74.h"
 
-extern zend_module_entry colopl_bc_module_entry;
-#define phpext_colopl_bc_ptr &colopl_bc_module_entry
-
 #define COLOPL_BC_PHP74_COMPARE_MODE_SILENT		0
 #define COLOPL_BC_PHP74_COMPARE_MODE_DEPRECATED	1
 #define COLOPL_BC_PHP74_COMPARE_MODE_LOG		2
@@ -38,8 +53,6 @@ extern zend_module_entry colopl_bc_module_entry;
 #define COLOPL_BC_PHP74_SORT_MODE_SILENT		0
 #define COLOPL_BC_PHP74_SORT_MODE_DEPRECATED	1
 #define COLOPL_BC_PHP74_SORT_MODE_LOG			2
-
-#define PHP_COLOPL_BC_VERSION "13.1.1"
 
 #if PHP_VERSION_ID < 80000
 # ifndef RETURN_THROWS
@@ -98,13 +111,15 @@ ZEND_EXTERN_MODULE_GLOBALS(colopl_bc)
 
 #define COLOPL_BC_G(v)	ZEND_MODULE_GLOBALS_ACCESSOR(colopl_bc, v)
 
+#endif	/* !COLOPL_BC_SECURITY_ONLY */
+
 PHP_MINIT_FUNCTION(colopl_bc);
 PHP_MSHUTDOWN_FUNCTION(colopl_bc);
 PHP_RINIT_FUNCTION(colopl_bc);
 PHP_MINFO_FUNCTION(colopl_bc);
 /* PHP_GINIT_FUNCTION(colopl_bc); */
 
-#if defined(ZTS) && defined(COMPILE_DL_COLOPL_BC)
+#if defined(ZTS) && defined(COMPILE_DL_COLOPL_BC) && PHP_VERSION_ID >= 70000
 ZEND_TSRMLS_CACHE_EXTERN()
 #endif
 

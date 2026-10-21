@@ -1,3 +1,10 @@
+# 13.2.0
+- Add security backports (`ext/colopl_bc_security.c`), buildable on every PHP release since 5.4
+- Build in "security only" mode on PHP versions that are not compatibility-layer targets (PHP 5.4 - 7.3, 8.0)
+- Add `colopl_bc.security.disable_session_upload_progress` INI directive (default: `0`), which detaches the `session.upload_progress` hook (`php_rfc1867_callback`) at the engine level
+- Declare an optional module dependency on `session` to guarantee MINIT ordering
+- Report security backport state in `phpinfo()`
+
 # 13.0.2
 - Add Ubuntu 26.04 LTS deb package build
 

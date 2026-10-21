@@ -3,6 +3,7 @@ Check PHP 7.4 native wrapper behavior for \Colopl\ColoplBc\Php74 functions.
 --EXTENSIONS--
 colopl_bc
 --SKIPIF--
+<?php if (!function_exists('Colopl\\ColoplBc\\Php74\\eq')) die('skip compatibility layer is not built on this PHP (security-only build)'); ?>
 <?php if (PHP_VERSION_ID >= 80000) die('skip PHP 7 native wrapper behavior only'); ?>
 --FILE--
 <?php

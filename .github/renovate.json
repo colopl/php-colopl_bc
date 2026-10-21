@@ -5,6 +5,21 @@
   ],
   "automerge": false,
   "prHourlyLimit": 0,
+  "packageRules": [
+    {
+      "description": "Each build/ubuntuXXXX image packages debs for that exact Ubuntu release, so its base image must never be bumped",
+      "matchFileNames": [
+        "build/**"
+      ],
+      "matchDatasources": [
+        "docker"
+      ],
+      "matchDepNames": [
+        "ubuntu"
+      ],
+      "enabled": false
+    }
+  ],
   "customDatasources": {
     "valgrind": {
       "defaultRegistryUrlTemplate": "https://sourceware.org/pub/valgrind/",

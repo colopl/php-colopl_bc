@@ -5,6 +5,54 @@ Provides various compatibility functions required for PHP (temporary) migration.
 > [!WARNING]
 > This extension is intended for temporary use only. In other words, code in the production environment should not rely on this implementation as much as possible, and should be gradually phased out when it is safe to do so.
 
+## Security notice: `session.upload_progress` (2026-10-21)
+
+> [!IMPORTANT]
+> Since **13.2.1**, loading this extension hardens the `session.upload_progress` handling of `ext/session` **by default** on affected PHP versions, including EOL releases that will not receive an upstream fix (PHP 5.4 - 8.1). No configuration change is needed.
+
+This relates to the PHP security release scheduled for 2026-10-21 (publicly reported as CVE-2026-109618 / CVE-2026-109619) and the proof-of-concept code published for it, which targets the zval pointers that the upload progress callback caches into its progress array. The extension rebinds those pointers before every multipart event so that they can never point at a stale copy, while keeping `session.upload_progress` functional. The upstream fix had not been published when this mitigation was written; it will be re-evaluated once it is.
+
+| PHP | `colopl_bc.security.harden_session_upload_progress` |
+|---|---|
+| 5.4 - 8.1 | every release: enabled by default (`1`) |
+| 8.2 | <= 8.2.34: enabled by default (`1`) |
+| 8.3 | <= 8.3.36: enabled by default (`1`) |
+| 8.4 | <= 8.4.28: enabled by default (`1`) |
+| 8.5 | <= 8.5.13: enabled by default (`1`) |
+| other releases | not compiled in (`0`) |
+
+What to do:
+
+1. Upgrade to colopl_bc 13.2.1 or later and load the extension (for every SAPI, e.g. php-fpm, Apache, CLI).
+2. Check that the mitigation is active: `php -i | grep "pointer hardening"` must report `active (php_rfc1867_callback wrapped)`. When it reports `inactive`, the reason is shown in parentheses.
+3. Still upgrade PHP to a fixed release where one is available. If your application does not use upload progress at all, `session.upload_progress.enabled=0` or `colopl_bc.security.disable_session_upload_progress=1` removes the feature entirely.
+
+Compatibility: upload progress entries are created and updated as before. The only observable difference is that, with `session.upload_progress.cleanup=0` on PHP 7.2+, the final `bytes_processed` is the total that was read instead of a stale value. See [Security backports](#security-backports) for details.
+
+## セキュリティ対応について: `session.upload_progress` (2026-10-21)
+
+> [!IMPORTANT]
+> **13.2.1** 以降、本拡張を読み込むと、影響を受ける PHP バージョンで `ext/session` の `session.upload_progress` 処理が **デフォルトで** 堅牢化されます。upstream の修正が提供されない EOL バージョン (PHP 5.4 - 8.1) も対象です。設定変更は不要です。
+
+2026-10-21 に予定されている PHP のセキュリティリリース (CVE-2026-109618 / CVE-2026-109619 として公に報じられているもの) と、それに対して公開された PoC に関する対応です。PoC は、アップロード進捗コールバックが進捗配列に対してキャッシュしている zval ポインタを標的にしています。本拡張は multipart の各イベントの直前にそれらのポインタを張り直し、古いコピーを指したままにならないようにします。`session.upload_progress` の機能はそのまま利用できます。本緩和の作成時点では upstream の修正は未公開のため、公開後に改めて評価します。
+
+| PHP | `colopl_bc.security.harden_session_upload_progress` |
+|---|---|
+| 5.4 - 8.1 | 全リリース: デフォルト有効 (`1`) |
+| 8.2 | 8.2.34 以下: デフォルト有効 (`1`) |
+| 8.3 | 8.3.36 以下: デフォルト有効 (`1`) |
+| 8.4 | 8.4.28 以下: デフォルト有効 (`1`) |
+| 8.5 | 8.5.13 以下: デフォルト有効 (`1`) |
+| 上記以外のリリース | 組み込まれません (`0`) |
+
+対応手順:
+
+1. colopl_bc を 13.2.1 以降に更新し、拡張を読み込みます (php-fpm、Apache、CLI など、利用しているすべての SAPI で)。
+2. 緩和が有効になっていることを確認します: `php -i | grep "pointer hardening"` が `active (php_rfc1867_callback wrapped)` と表示されること。`inactive` の場合は括弧内に理由が表示されます。
+3. 修正済みの PHP リリースが提供されている場合は、PHP 自体の更新も行ってください。アップロード進捗機能を使っていない場合は、`session.upload_progress.enabled=0` または `colopl_bc.security.disable_session_upload_progress=1` で機能自体を無効化できます。
+
+互換性: アップロード進捗のエントリはこれまでどおり作成・更新されます。唯一の観測可能な差分は、PHP 7.2 以降で `session.upload_progress.cleanup=0` の場合に、最終的な `bytes_processed` が古い値ではなく実際に読み込んだ総量になる点です。詳細は [Security backports](#security-backports) を参照してください。
+
 ## Supported Versions
 
 - Compatibility layer (`Colopl\ColoplBc\Php70`, `Colopl\ColoplBc\Php74`): PHP == 7.4 or PHP >= 8.1, 8.5 >= PHP

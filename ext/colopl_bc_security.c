@@ -305,12 +305,76 @@ static colopl_bc_security_rfc1867_result colopl_bc_security_suph_formdata(void *
 	return result;
 }
 
+/*
+ * The multipart parser runs from php_hash_environment(), before RINIT. The
+ * (un)serializer state in ext/standard and the request state of ext/session
+ * are only reset by their RINIT, so when the previous request of this process
+ * ended without a clean shutdown (bailout), the upload progress handler of the
+ * next request works on stale state. The 2026-10-21 fix resets both at
+ * MULTIPART_EVENT_START (php_basic_early_rinit(), php_rinit_session_globals());
+ * this does the same with the fields that exist in the headers built against.
+ * A stale PS(id) is dropped, not released, exactly as ext/session does.
+ */
+static void colopl_bc_security_suph_early_rinit(php_ps_globals *ps TSRMLS_DC)
+{
+	BG(serialize_lock) = 0;
+	memset(&BG(serialize), 0, sizeof(BG(serialize)));
+	memset(&BG(unserialize), 0, sizeof(BG(unserialize)));
+
+	ps->id = NULL;
+	ps->session_status = php_session_none;
+	ps->mod_data = NULL;
+	ps->mod_user_is_open = 0;
+# if PHP_VERSION_ID >= 70000
+	ps->define_sid = 1;
+	ps->session_vars = NULL;
+	ZVAL_UNDEF(&ps->http_session_vars);
+# else
+	ps->http_session_vars = NULL;
+# endif
+# if PHP_VERSION_ID >= 70100
+	ps->in_save_handler = 0;
+# endif
+# if PHP_VERSION_ID >= 70200
+	ps->set_handler = 0;
+# endif
+}
+
+/* $_SESSION was populated before RINIT by the upload progress handler; the
+ * 2026-10-21 fix removes it again at MULTIPART_EVENT_END so that the request
+ * starts without it, as it does for every other request. */
+static void colopl_bc_security_suph_drop_session_global(TSRMLS_D)
+{
+# if PHP_VERSION_ID >= 70000
+	zend_string *name = zend_string_init("_SESSION", sizeof("_SESSION") - 1, 0);
+	zend_delete_global_variable(name);
+	zend_string_release(name);
+# else
+	zend_delete_global_variable("_SESSION", sizeof("_SESSION") - 1 TSRMLS_CC);
+# endif
+}
+
 static colopl_bc_security_rfc1867_result colopl_bc_security_suph_callback(unsigned int event, void *event_data, void **extra TSRMLS_DC)
 {
 	php_ps_globals *ps;
 	php_session_rfc1867_progress *progress;
+	colopl_bc_security_rfc1867_result result;
+
+# if PHP_VERSION_ID >= 80400
+	/* request_parse_body() parses a body after RINIT; the 2026-10-21 fix makes
+	 * ext/session ignore those events, as its handler corrupts the session then. */
+	if (PG(modules_activated)) {
+		return SUCCESS;
+	}
+# endif
 
 	switch (event) {
+		case MULTIPART_EVENT_START:
+			ps = COLOPL_BC_SECURITY_PS_GLOBALS();
+			if (ps->rfc1867_enabled) {
+				colopl_bc_security_suph_early_rinit(ps TSRMLS_CC);
+			}
+			break;
 		case MULTIPART_EVENT_FORMDATA:
 			return colopl_bc_security_suph_formdata(event_data, extra TSRMLS_CC);
 		case MULTIPART_EVENT_FILE_START:
@@ -362,7 +426,16 @@ static colopl_bc_security_rfc1867_result colopl_bc_security_suph_callback(unsign
 			break;
 	}
 
-	return colopl_bc_security_suph_next(event, event_data, extra TSRMLS_CC);
+	result = colopl_bc_security_suph_next(event, event_data, extra TSRMLS_CC);
+
+	if (event == MULTIPART_EVENT_END) {
+		ps = COLOPL_BC_SECURITY_PS_GLOBALS();
+		if (ps->rfc1867_enabled) {
+			colopl_bc_security_suph_drop_session_global(TSRMLS_C);
+		}
+	}
+
+	return result;
 }
 
 static long colopl_bc_security_runtime_version_id(TSRMLS_D)

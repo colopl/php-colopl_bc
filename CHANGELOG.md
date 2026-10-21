@@ -1,3 +1,11 @@
+# 13.3.0
+- Align the `session.upload_progress` mitigations with the 2026-10-21 PHP security release (GHSA-w8hw-w9fx-j79w / GHSA-6wmf-4rv5-p3rp, CVE-2026-109618 / CVE-2026-109619, fixed in PHP 8.2.35 / 8.3.36 / 8.4.27 / 8.5.12):
+  - The affected-version ranges now end at those releases; on fixed builds the pointer hardening is not compiled in
+  - At the start of every multipart body the hardening wrapper resets the (un)serializer state of ext/standard and the request state of ext/session, as the fixed releases do, so that a request that follows a bailout does not run the upload progress handler on stale globals
+  - After the body the `$_SESSION` global populated before RINIT by the upload progress handler is removed again, as the fixed releases do
+  - On PHP 8.4+, multipart events delivered after RINIT (`request_parse_body()`) are no longer forwarded to ext/session, as the fixed releases do
+- Document which parts of the upstream fix cannot be provided by an extension (OOM bailout replacement in the engine, decoding the session without resolving classes before RINIT) and that `colopl_bc.security.disable_session_upload_progress=1` is the complete mitigation for the latter
+
 # 13.2.3
 - Add `colopl_bc.security.isolate_unserialize` INI directive (default: `1`), which runs `unserialize()` with `serialize_lock` held so that nested calls started from destructors never share the outer call's back-reference / delayed-call state
 

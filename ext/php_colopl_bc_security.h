@@ -90,6 +90,7 @@
 #define COLOPL_BC_SECURITY_INI_ISOLATE_UNSERIALIZE "colopl_bc.security.isolate_unserialize"
 #define COLOPL_BC_SECURITY_INI_ABORT_ON_MEMORY_ERROR "colopl_bc.security.abort_on_memory_error"
 #define COLOPL_BC_SECURITY_INI_ABORT_ON_TIMEOUT "colopl_bc.security.abort_on_timeout"
+#define COLOPL_BC_SECURITY_INI_RESET_STALE_REQUEST_STATE "colopl_bc.security.reset_stale_request_state"
 
 /*
  * TODO(secfix): once the upstream fix for the unserialize() nested-state issue
@@ -100,6 +101,9 @@
 
 int colopl_bc_security_minit(INIT_FUNC_ARGS);
 int colopl_bc_security_mshutdown(SHUTDOWN_FUNC_ARGS);
+
+/* Module post-RSHUTDOWN hook (zend_module_entry.post_deactivate_func): see reset_stale_request_state. */
+int colopl_bc_security_post_deactivate(void);
 void colopl_bc_security_minfo(ZEND_MODULE_INFO_FUNC_ARGS);
 
 /* Whether the session.upload_progress hook is currently detached by this extension. */
@@ -119,5 +123,8 @@ int colopl_bc_security_abort_on_memory_error_is_active(void);
 
 /* Whether a max_execution_time fatal error currently ends the process instead of bailing out. */
 int colopl_bc_security_abort_on_timeout_is_active(void);
+
+/* Whether request-owned state that outlives its memory is cleared at the end of every request. */
+int colopl_bc_security_stale_request_state_reset_is_active(void);
 
 #endif	/* PHP_COLOPL_BC_SECURITY_H */

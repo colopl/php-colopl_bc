@@ -512,7 +512,13 @@ static const char *colopl_bc_security_session_serialize_handler_state(void)
  * supported use.
  */
 
+/* Internal handlers use ZEND_FASTCALL since PHP 7.3 (__vectorcall on MSVC),
+ * so the pointer type and the replacement handler must follow the headers. */
+#if PHP_VERSION_ID >= 70200
+typedef zif_handler colopl_bc_security_zif_handler;
+#else
 typedef void (*colopl_bc_security_zif_handler)(INTERNAL_FUNCTION_PARAMETERS);
+#endif
 
 static int colopl_bc_security_unser_requested = 0;	/* INI value */
 static int colopl_bc_security_unser_applied = 0;	/* handler replaced by us */
@@ -523,7 +529,7 @@ int colopl_bc_security_unserialize_is_isolated(void)
 	return colopl_bc_security_unser_applied;
 }
 
-static void colopl_bc_security_unserialize_handler(INTERNAL_FUNCTION_PARAMETERS)
+static ZEND_NAMED_FUNCTION(colopl_bc_security_unserialize_handler)
 {
 	BG(serialize_lock)++;
 	colopl_bc_security_unser_orig(INTERNAL_FUNCTION_PARAM_PASSTHRU);

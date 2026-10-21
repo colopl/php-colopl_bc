@@ -85,6 +85,14 @@
 #define COLOPL_BC_SECURITY_INI_DISABLE_SESSION_UPLOAD_PROGRESS "colopl_bc.security.disable_session_upload_progress"
 #define COLOPL_BC_SECURITY_INI_HARDEN_SESSION_UPLOAD_PROGRESS "colopl_bc.security.harden_session_upload_progress"
 #define COLOPL_BC_SECURITY_INI_LOCK_SESSION_SERIALIZE_HANDLER "colopl_bc.security.lock_session_serialize_handler"
+#define COLOPL_BC_SECURITY_INI_ISOLATE_UNSERIALIZE "colopl_bc.security.isolate_unserialize"
+
+/*
+ * TODO(secfix): once the upstream fix for the unserialize() nested-state issue
+ * is published, replace this with per-branch "first fixed" PHP_VERSION_ID checks
+ * so that the wrapper is a no-op on fixed builds.
+ */
+#define COLOPL_BC_SECURITY_UNSERIALIZE_NESTED_STATE_AFFECTED(id) 1
 
 int colopl_bc_security_minit(INIT_FUNC_ARGS);
 int colopl_bc_security_mshutdown(SHUTDOWN_FUNC_ARGS);
@@ -98,5 +106,8 @@ int colopl_bc_security_session_upload_progress_is_hardened(void);
 
 /* Whether session.serialize_handler is currently locked to PHP_INI_SYSTEM by this extension. */
 int colopl_bc_security_session_serialize_handler_is_locked(void);
+
+/* Whether unserialize() is currently wrapped so that nested calls never share its state. */
+int colopl_bc_security_unserialize_is_isolated(void);
 
 #endif	/* PHP_COLOPL_BC_SECURITY_H */

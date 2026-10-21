@@ -173,6 +173,15 @@ Narrows `session.serialize_handler` from `PHP_INI_ALL` to `PHP_INI_SYSTEM` in th
 
 This is an opt-in, feature-disabling mitigation: deployments that switch the handler per directory or per request keep working only with `0`. Applies to every PHP version (5.4+); when `ext/session` is not loaded there is nothing to lock and `phpinfo()` reports it as `inactive`.
 
+### `colopl_bc.security.isolate_unserialize` (default: `1`)
+
+Runs every `unserialize()` call with `ext/standard`'s `serialize_lock` held, so that a nested `unserialize()` / `serialize()` call started from inside it never shares the outer call's state (the table that resolves `r:` / `R:` back-references and queues delayed `__wakeup` / `__unserialize` / destructor calls). `ext/standard` already holds that lock around every nested entry point it supports (`__wakeup`, `__unserialize`, `Serializable::unserialize()`, `unserialize_callback_func`), so those keep their behaviour; what changes is that code reached by accident while a call is still parsing or tearing down its state (destructors of values that are replaced or released during the call) can no longer resolve back-references into that state.
+
+- `0`: not applied.
+- `1`: applied. `unserialize()` results, references inside one string and the supported nested calls are unchanged. A destructor-started nested `unserialize()` with a back-reference into the outer call fails as if the reference did not exist, which was never a supported use.
+
+Enabled by default because the supported nested entry points already run under the lock and valid input is unaffected; the wrapper is only installed on PHP versions the extension considers affected (currently every version, to be narrowed once the upstream fix for the 2026-10-21 security release is published). Note that it wraps the `unserialize()` function only; internal callers such as session decoding are not wrapped, but a nested `unserialize()` started from them goes through the wrapper and is isolated.
+
 ## API references
 
 ### INI directives

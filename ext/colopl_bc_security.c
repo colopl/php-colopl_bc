@@ -19,6 +19,7 @@
 #include "php_ini.h"
 #include "ext/standard/info.h"
 #include "rfc1867.h"
+#include "ext/standard/basic_functions.h"
 
 #include "php_colopl_bc_security.h"
 
@@ -488,10 +489,114 @@ static const char *colopl_bc_security_session_serialize_handler_state(void)
 	return "inactive (disabled by INI)";
 }
 
+/*
+ * Security backport: unserialize() nested-state isolation
+ *
+ * unserialize() keeps per-call state (the var_hash used to resolve r: / R:
+ * back-references and to queue delayed __wakeup / __unserialize / destructor
+ * calls). A nested unserialize() call shares the outermost call's state unless
+ * BG(serialize_lock) is held. ext/standard holds that lock itself around every
+ * nested entry point it intends to support (__wakeup, __unserialize,
+ * Serializable::unserialize(), unserialize_callback_func), so sharing can only
+ * be reached from code that runs during unserialize() by accident: destructors
+ * of values that are replaced or released while the call is still parsing or
+ * tearing down its state. Such a nested call can then resolve a back-reference
+ * into state that the outer call is in the middle of destroying.
+ *
+ * This mitigation wraps the unserialize() handler and holds BG(serialize_lock)
+ * for the whole duration of the call, so that every nested (un)serialize()
+ * call, whatever started it, runs on its own state. The intended nested entry
+ * points already run under the lock, so their behaviour does not change; the
+ * only observable difference is that a destructor-started nested unserialize()
+ * can no longer resolve back-references into the outer call, which was never a
+ * supported use.
+ */
+
+typedef void (*colopl_bc_security_zif_handler)(INTERNAL_FUNCTION_PARAMETERS);
+
+static int colopl_bc_security_unser_requested = 0;	/* INI value */
+static int colopl_bc_security_unser_applied = 0;	/* handler replaced by us */
+static colopl_bc_security_zif_handler colopl_bc_security_unser_orig = NULL;
+
+int colopl_bc_security_unserialize_is_isolated(void)
+{
+	return colopl_bc_security_unser_applied;
+}
+
+static void colopl_bc_security_unserialize_handler(INTERNAL_FUNCTION_PARAMETERS)
+{
+	BG(serialize_lock)++;
+	colopl_bc_security_unser_orig(INTERNAL_FUNCTION_PARAM_PASSTHRU);
+	BG(serialize_lock)--;
+}
+
+static zend_function *colopl_bc_security_find_internal_function(const char *name, size_t len TSRMLS_DC)
+{
+#if PHP_VERSION_ID >= 70000
+	return zend_hash_str_find_ptr(CG(function_table), name, len);
+#else
+	zend_function *fn;
+
+	if (zend_hash_find(CG(function_table), name, len + 1, (void **) &fn) == SUCCESS) {
+		return fn;
+	}
+	return NULL;
+#endif
+}
+
+static void colopl_bc_security_unserialize_isolate(TSRMLS_D)
+{
+	zend_function *fn;
+
+	if (!colopl_bc_security_unser_requested || colopl_bc_security_unser_applied) {
+		return;
+	}
+	if (!COLOPL_BC_SECURITY_UNSERIALIZE_NESTED_STATE_AFFECTED(PHP_VERSION_ID)) {
+		return;
+	}
+	fn = colopl_bc_security_find_internal_function("unserialize", sizeof("unserialize") - 1 TSRMLS_CC);
+	if (!fn || fn->type != ZEND_INTERNAL_FUNCTION || !fn->internal_function.handler) {
+		return;
+	}
+	colopl_bc_security_unser_orig = fn->internal_function.handler;
+	fn->internal_function.handler = colopl_bc_security_unserialize_handler;
+	colopl_bc_security_unser_applied = 1;
+}
+
+static void colopl_bc_security_unserialize_restore(TSRMLS_D)
+{
+	zend_function *fn;
+
+	if (!colopl_bc_security_unser_applied) {
+		return;
+	}
+	fn = colopl_bc_security_find_internal_function("unserialize", sizeof("unserialize") - 1 TSRMLS_CC);
+	if (fn && fn->type == ZEND_INTERNAL_FUNCTION && fn->internal_function.handler == colopl_bc_security_unserialize_handler) {
+		fn->internal_function.handler = colopl_bc_security_unser_orig;
+	}
+	colopl_bc_security_unser_orig = NULL;
+	colopl_bc_security_unser_applied = 0;
+}
+
+static const char *colopl_bc_security_unserialize_state(void)
+{
+	if (colopl_bc_security_unser_applied) {
+		return "active (unserialize() runs with serialize_lock held)";
+	}
+	if (!colopl_bc_security_unser_requested) {
+		return "inactive (disabled by INI)";
+	}
+	if (!COLOPL_BC_SECURITY_UNSERIALIZE_NESTED_STATE_AFFECTED(PHP_VERSION_ID)) {
+		return "inactive (not needed on this PHP version)";
+	}
+	return "inactive (unserialize() is not registered)";
+}
+
 PHP_INI_BEGIN()
 	PHP_INI_ENTRY(COLOPL_BC_SECURITY_INI_DISABLE_SESSION_UPLOAD_PROGRESS, "0", PHP_INI_SYSTEM, NULL)
 	PHP_INI_ENTRY(COLOPL_BC_SECURITY_INI_HARDEN_SESSION_UPLOAD_PROGRESS, COLOPL_BC_SECURITY_SUPH_INI_DEFAULT, PHP_INI_SYSTEM, NULL)
 	PHP_INI_ENTRY(COLOPL_BC_SECURITY_INI_LOCK_SESSION_SERIALIZE_HANDLER, "0", PHP_INI_SYSTEM, NULL)
+	PHP_INI_ENTRY(COLOPL_BC_SECURITY_INI_ISOLATE_UNSERIALIZE, "1", PHP_INI_SYSTEM, NULL)
 PHP_INI_END()
 
 int colopl_bc_security_session_upload_progress_is_hardened(void)
@@ -636,11 +741,15 @@ int colopl_bc_security_minit(INIT_FUNC_ARGS)
 	colopl_bc_security_ssh_requested = INI_BOOL(COLOPL_BC_SECURITY_INI_LOCK_SESSION_SERIALIZE_HANDLER) ? 1 : 0;
 	colopl_bc_security_session_serialize_handler_lock(TSRMLS_C);
 
+	colopl_bc_security_unser_requested = INI_BOOL(COLOPL_BC_SECURITY_INI_ISOLATE_UNSERIALIZE) ? 1 : 0;
+	colopl_bc_security_unserialize_isolate(TSRMLS_C);
+
 	return SUCCESS;
 }
 
 int colopl_bc_security_mshutdown(SHUTDOWN_FUNC_ARGS)
 {
+	colopl_bc_security_unserialize_restore(TSRMLS_C);
 	colopl_bc_security_session_serialize_handler_unlock(TSRMLS_C);
 	colopl_bc_security_session_upload_progress_unharden();
 	colopl_bc_security_session_upload_progress_reset();
@@ -675,5 +784,7 @@ void colopl_bc_security_minfo(ZEND_MODULE_INFO_FUNC_ARGS)
 	php_info_print_table_row(2, COLOPL_BC_SECURITY_INI_HARDEN_SESSION_UPLOAD_PROGRESS, colopl_bc_security_suph_requested ? "1" : "0");
 	php_info_print_table_row(2, "session.serialize_handler lock", colopl_bc_security_session_serialize_handler_state());
 	php_info_print_table_row(2, COLOPL_BC_SECURITY_INI_LOCK_SESSION_SERIALIZE_HANDLER, colopl_bc_security_ssh_requested ? "1" : "0");
+	php_info_print_table_row(2, "unserialize() nested-state isolation", colopl_bc_security_unserialize_state());
+	php_info_print_table_row(2, COLOPL_BC_SECURITY_INI_ISOLATE_UNSERIALIZE, colopl_bc_security_unser_requested ? "1" : "0");
 	php_info_print_table_end();
 }

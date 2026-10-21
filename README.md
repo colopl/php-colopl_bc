@@ -7,10 +7,18 @@ Provides various compatibility functions required for PHP (temporary) migration.
 
 ## Security notice: `session.upload_progress` (2026-10-21)
 
+> [!CAUTION]
+> **DO NOT RELY ON THIS EXTENSION FOR SECURITY. THE MITIGATIONS BELOW ARE A TEMPORARY, BEST-EFFORT STOPGAP AND ARE NOT A REPLACEMENT FOR THE OFFICIAL PHP SECURITY RELEASE. UPGRADE PHP TO A SUPPORTED, PATCHED RELEASE AS SOON AS POSSIBLE. IF YOU RUN AN END-OF-LIFE PHP VERSION (5.4 - 8.1), MIGRATE TO A SUPPORTED VERSION.**
+
 > [!IMPORTANT]
 > Since **13.2.1**, loading this extension hardens the `session.upload_progress` handling of `ext/session` **by default** on affected PHP versions, including EOL releases that will not receive an upstream fix (PHP 5.4 - 8.1). No configuration change is needed.
+>
+> **Targeted CVEs:**
+>
+> - **CVE-2026-109618 / CVE-2026-109619** (presumed): the upstream advisory and fix had not been published when this mitigation was written, so the mapping is based on the public reports and proof-of-concept code.
+> - **CVE-2020-7062**: on PHP older than 7.2.28 / 7.3.15 / 7.4.3, including every PHP 5.4 - 7.1 release.
 
-This relates to the PHP security release scheduled for 2026-10-21 (publicly reported as CVE-2026-109618 / CVE-2026-109619) and the proof-of-concept code published for it, which targets the zval pointers that the upload progress callback caches into its progress array. The extension rebinds those pointers before every multipart event so that they can never point at a stale copy, while keeping `session.upload_progress` functional. On PHP older than 7.2.28 / 7.3.15 / 7.4.3 it also prevents the crash of CVE-2020-7062 in the same code path. The upstream fix had not been published when this mitigation was written; it will be re-evaluated once it is.
+This relates to the PHP security release scheduled for 2026-10-21 (publicly reported as CVE-2026-109618 / CVE-2026-109619) and the proof-of-concept code published for it, which targets the zval pointers that the upload progress callback caches into its progress array. The extension rebinds those pointers before every multipart event so that they can never point at a stale copy, while keeping `session.upload_progress` functional. On PHP older than 7.2.28 / 7.3.15 / 7.4.3 it also prevents the crash of CVE-2020-7062 in the same code path. It also stops the progress hook from taking the session ID from the request body when `session.use_only_cookies=1`, and from saving a session it cannot encode (which wipes it). The upstream fix had not been published when this mitigation was written; it will be re-evaluated once it is.
 
 | PHP | `colopl_bc.security.harden_session_upload_progress` |
 |---|---|
@@ -27,14 +35,22 @@ What to do:
 2. Check that the mitigation is active: `php -i | grep "pointer hardening"` must report `active (php_rfc1867_callback wrapped)`. When it reports `inactive`, the reason is shown in parentheses.
 3. Still upgrade PHP to a fixed release where one is available. If your application does not use upload progress at all, `session.upload_progress.enabled=0` or `colopl_bc.security.disable_session_upload_progress=1` removes the feature entirely.
 
-Compatibility: upload progress entries are created and updated as before. The only observable difference is that, with `session.upload_progress.cleanup=0` on PHP 7.2+, the final `bytes_processed` is the total that was read instead of a stale value. See [Security backports](#security-backports) for details.
+Compatibility: upload progress entries are created and updated as before. With `session.upload_progress.cleanup=0` on PHP 7.2+, the final `bytes_processed` is the total that was read instead of a stale value. Uploads are not tracked when, with `session.use_only_cookies=1`, the session ID only comes from the request body, or when the progress key contains a character the `php` serializer cannot store (`|`); neither case works correctly today. See [Security backports](#security-backports) for details.
 
 ## セキュリティ対応について: `session.upload_progress` (2026-10-21)
 
+> [!CAUTION]
+> **セキュリティ対策を本拡張に頼らないでください。以下の緩和は一時的かつベストエフォートの応急処置であり、PHP 公式のセキュリティリリースの代わりにはなりません。できるだけ早く、サポート中で修正済みの PHP リリースへ更新してください。EOL の PHP (5.4 - 8.1) を使っている場合は、サポート中のバージョンへ移行してください。**
+
 > [!IMPORTANT]
 > **13.2.1** 以降、本拡張を読み込むと、影響を受ける PHP バージョンで `ext/session` の `session.upload_progress` 処理が **デフォルトで** 堅牢化されます。upstream の修正が提供されない EOL バージョン (PHP 5.4 - 8.1) も対象です。設定変更は不要です。
+>
+> **対応を想定している CVE:**
+>
+> - **CVE-2026-109618 / CVE-2026-109619** (推定): 本緩和の作成時点では upstream のアドバイザリと修正が未公開のため、公開されている報道と PoC に基づく対応付けです。
+> - **CVE-2020-7062**: 7.2.28 / 7.3.15 / 7.4.3 より古い PHP (PHP 5.4 - 7.1 の全リリースを含む) が対象です。
 
-2026-10-21 に予定されている PHP のセキュリティリリース (CVE-2026-109618 / CVE-2026-109619 として公に報じられているもの) と、それに対して公開された PoC に関する対応です。PoC は、アップロード進捗コールバックが進捗配列に対してキャッシュしている zval ポインタを標的にしています。本拡張は multipart の各イベントの直前にそれらのポインタを張り直し、古いコピーを指したままにならないようにします。`session.upload_progress` の機能はそのまま利用できます。また 7.2.28 / 7.3.15 / 7.4.3 より古い PHP では、同じ処理経路にある CVE-2020-7062 によるクラッシュも防ぎます。本緩和の作成時点では upstream の修正は未公開のため、公開後に改めて評価します。
+2026-10-21 に予定されている PHP のセキュリティリリース (CVE-2026-109618 / CVE-2026-109619 として公に報じられているもの) と、それに対して公開された PoC に関する対応です。PoC は、アップロード進捗コールバックが進捗配列に対してキャッシュしている zval ポインタを標的にしています。本拡張は multipart の各イベントの直前にそれらのポインタを張り直し、古いコピーを指したままにならないようにします。`session.upload_progress` の機能はそのまま利用できます。また 7.2.28 / 7.3.15 / 7.4.3 より古い PHP では、同じ処理経路にある CVE-2020-7062 によるクラッシュも防ぎます。さらに、`session.use_only_cookies=1` のときに進捗フックがリクエスト本文からセッション ID を取り込むことと、encode できないセッションを保存して中身を消してしまうことも防ぎます。本緩和の作成時点では upstream の修正は未公開のため、公開後に改めて評価します。
 
 | PHP | `colopl_bc.security.harden_session_upload_progress` |
 |---|---|
@@ -51,7 +67,7 @@ Compatibility: upload progress entries are created and updated as before. The on
 2. 緩和が有効になっていることを確認します: `php -i | grep "pointer hardening"` が `active (php_rfc1867_callback wrapped)` と表示されること。`inactive` の場合は括弧内に理由が表示されます。
 3. 修正済みの PHP リリースが提供されている場合は、PHP 自体の更新も行ってください。アップロード進捗機能を使っていない場合は、`session.upload_progress.enabled=0` または `colopl_bc.security.disable_session_upload_progress=1` で機能自体を無効化できます。
 
-互換性: アップロード進捗のエントリはこれまでどおり作成・更新されます。唯一の観測可能な差分は、PHP 7.2 以降で `session.upload_progress.cleanup=0` の場合に、最終的な `bytes_processed` が古い値ではなく実際に読み込んだ総量になる点です。詳細は [Security backports](#security-backports) を参照してください。
+互換性: アップロード進捗のエントリはこれまでどおり作成・更新されます。PHP 7.2 以降で `session.upload_progress.cleanup=0` の場合、最終的な `bytes_processed` は古い値ではなく実際に読み込んだ総量になります。また、`session.use_only_cookies=1` でセッション ID がリクエスト本文にしかない場合と、進捗キーに `php` シリアライザが保存できない文字 (`|`) が含まれる場合は、進捗を追跡しません。どちらも現状では正しく動作していないケースです。詳細は [Security backports](#security-backports) を参照してください。
 
 ## Supported Versions
 
@@ -140,6 +156,11 @@ Keeps `session.upload_progress` functional while removing the stale-pointer clas
 - `1`: applied. Upload progress entries are created and updated as before. The only observable difference is that with `session.upload_progress.cleanup=0` on PHP 7.2+ the final `bytes_processed` is the total that was read (as on PHP 5.4 - 7.1) instead of a stale value.
 
 When the running PHP is older than 7.2.28 / 7.3.15 / 7.4.3 (including every PHP 5.4 - 7.1 release), the wrapper also guards CVE-2020-7062 (bug #79221): with `cleanup=0`, a body that carries the session ID and the progress key but no file part makes `ext/session` store into a progress array that was never created at the end of the upload, which crashes the process. The guard makes `ext/session` skip that store, as the fixed releases do. `phpinfo()` reports it as `session.upload_progress CVE-2020-7062 guard`.
+
+The wrapper also closes two logic gaps of the hook that public proof-of-concept code relies on:
+
+- With `session.use_only_cookies=1`, a form field named after the session (`PHPSESSID`) in the multipart body is no longer taken as the session ID of the progress record. `session_start()` never takes the session ID from the request body in that configuration, so only requests that rely on the inconsistency are affected; the field still reaches `$_POST`, and `session.use_only_cookies=0` keeps the previous behaviour.
+- With the `php` serializer (`session.serialize_handler=php`, the default), a progress key containing `|` (and `!` before PHP 7.2) is not tracked. Such a key makes `php_session_encode()` fail on every progress update, and the session is then saved as an empty string, wiping the data stored under that session ID.
 
 Affected PHP versions (compiled in and enabled by default): PHP <= 8.1 (every release), PHP 8.2 <= 8.2.34, PHP 8.3 <= 8.3.36, PHP 8.4 <= 8.4.28, PHP 8.5 <= 8.5.13. On other versions the mitigation is not compiled in and the directive defaults to `0`. Because the callback's data layout is taken from the PHP headers used at build time, the wrapper is also only installed when the *running* PHP version is affected and the session globals match those headers; otherwise `phpinfo()` reports it as `inactive` with the reason. It is not installed when `colopl_bc.security.disable_session_upload_progress=1` has already detached the hook.
 

@@ -4,6 +4,8 @@
   - Only installed when the running PHP version is affected as well and the session globals layout matches the headers the extension was built against
   - With `session.upload_progress.cleanup=0` on PHP 7.2+, the final `bytes_processed` is now the total that was read instead of a stale value
   - Also guards CVE-2020-7062 (bug #79221, crash at the end of an upload with `cleanup=0` and no file part) when the running PHP is older than 7.2.28 / 7.3.15 / 7.4.3
+  - With `session.use_only_cookies=1`, a session ID form field in the multipart body is no longer taken for the progress record (as `session_start()` already behaves)
+  - With the `php` serializer, a progress key containing `|` (and `!` before PHP 7.2) is not tracked instead of making every progress update save the session as an empty string
 - Report the hardening and CVE-2020-7062 guard state in `phpinfo()`
 - Fix `colopl_bc.security.disable_session_upload_progress` not being applied again on a subsequent MINIT when the module is not unloaded in between (static builds, `ZEND_DONT_UNLOAD_MODULES`)
 

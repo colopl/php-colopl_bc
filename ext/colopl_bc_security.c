@@ -96,6 +96,13 @@ static int colopl_bc_security_sup_had_callback = 0;	/* a hook was registered whe
  * observable difference is that, with cleanup=0, the final bytes_processed is
  * the total that was read (as on PHP 5.4 - 7.1) instead of a stale value.
  *
+ * The same wrapper also closes two logic gaps of the hook that public PoC code
+ * relies on, without affecting requests that work today: with
+ * session.use_only_cookies=1 a session ID form field is not taken for the
+ * progress record (session_start() does not take it either), and a progress
+ * key that the "php" serializer cannot encode is not tracked (it would make
+ * every update() save the session as an empty string).
+ *
  * The record layout (php_session_rfc1867_progress, php_ps_globals) is taken from
  * the headers of the PHP release this extension is built against. A build can be
  * loaded into a later release of the same branch, so the wrapper is only
@@ -221,12 +228,90 @@ static int colopl_bc_security_suph_rebind(php_session_rfc1867_progress *progress
 
 # endif	/* PHP_VERSION_ID >= 70000 */
 
+/* php_session_encode() with the "php" serializer fails for a key containing
+ * PS_DELIMITER, and before PHP 7.2 also PS_UNDEF_MARKER (ext/session/session.c). */
+# if PHP_VERSION_ID < 70200
+#  define COLOPL_BC_SECURITY_SUPH_PHP_SERIALIZER_REJECTED "|!"
+# else
+#  define COLOPL_BC_SECURITY_SUPH_PHP_SERIALIZER_REJECTED "|"
+# endif
+
+static int colopl_bc_security_suph_key_encodable(const php_ps_globals *ps, const php_session_rfc1867_progress *progress)
+{
+	const char *key, *c;
+	size_t key_len;
+
+	if (!ps->serializer || !ps->serializer->name || strcmp(ps->serializer->name, "php") != 0) {
+		return 1;
+	}
+# if PHP_VERSION_ID >= 70000
+	key = ZSTR_VAL(progress->key.s);
+	key_len = ZSTR_LEN(progress->key.s);
+# else
+	key = progress->key.c;
+	key_len = progress->key.len;
+# endif
+	for (c = COLOPL_BC_SECURITY_SUPH_PHP_SERIALIZER_REJECTED; *c; c++) {
+		if (memchr(key, *c, key_len)) {
+			return 0;
+		}
+	}
+
+	return 1;
+}
+
+/*
+ * ext/session takes the session ID for the progress record from a form field
+ * named after the session even with session.use_only_cookies=1, which
+ * session_start() never does. With use_only_cookies=1 the record keeps the ID
+ * it had before that field (none, or the cookie found when the progress key
+ * arrived); the field itself still reaches $_POST.
+ */
+# if PHP_VERSION_ID >= 80500
+/* PS(session_name) is a zend_string since PHP 8.5. */
+#  define COLOPL_BC_SECURITY_SUPH_IS_SESSION_NAME(ps, name) \
+	((ps)->session_name && zend_string_equals_cstr((ps)->session_name, (name), strlen(name)))
+# else
+#  define COLOPL_BC_SECURITY_SUPH_IS_SESSION_NAME(ps, name) \
+	((ps)->session_name && strcmp((name), (ps)->session_name) == 0)
+# endif
+
+static colopl_bc_security_rfc1867_result colopl_bc_security_suph_formdata(void *event_data, void **extra TSRMLS_DC)
+{
+	php_ps_globals *ps = COLOPL_BC_SECURITY_PS_GLOBALS();
+	multipart_event_formdata *data = (multipart_event_formdata *) event_data;
+	php_session_rfc1867_progress *progress = ps->rfc1867_enabled ? ps->rfc1867_progress : NULL;
+	colopl_bc_security_rfc1867_result result;
+	zval sid;
+
+	if (!progress || !ps->use_only_cookies || !data->name || !COLOPL_BC_SECURITY_SUPH_IS_SESSION_NAME(ps, data->name)) {
+		return colopl_bc_security_suph_next(MULTIPART_EVENT_FORMDATA, event_data, extra TSRMLS_CC);
+	}
+
+# if PHP_VERSION_ID >= 70000
+	ZVAL_COPY(&sid, &progress->sid);
+	result = colopl_bc_security_suph_next(MULTIPART_EVENT_FORMDATA, event_data, extra TSRMLS_CC);
+	zval_ptr_dtor(&progress->sid);
+	ZVAL_COPY_VALUE(&progress->sid, &sid);
+# else
+	sid = progress->sid;
+	zval_copy_ctor(&sid);
+	result = colopl_bc_security_suph_next(MULTIPART_EVENT_FORMDATA, event_data, extra TSRMLS_CC);
+	zval_dtor(&progress->sid);
+	progress->sid = sid;
+# endif
+
+	return result;
+}
+
 static colopl_bc_security_rfc1867_result colopl_bc_security_suph_callback(unsigned int event, void *event_data, void **extra TSRMLS_DC)
 {
 	php_ps_globals *ps;
 	php_session_rfc1867_progress *progress;
 
 	switch (event) {
+		case MULTIPART_EVENT_FORMDATA:
+			return colopl_bc_security_suph_formdata(event_data, extra TSRMLS_CC);
 		case MULTIPART_EVENT_FILE_START:
 		case MULTIPART_EVENT_FILE_DATA:
 		case MULTIPART_EVENT_FILE_END:
@@ -243,13 +328,18 @@ static colopl_bc_security_rfc1867_result colopl_bc_security_suph_callback(unsign
 				break;
 			}
 			if (!COLOPL_BC_SECURITY_SUPH_HAS_DATA(progress)) {
-				/* No FILE_START yet. CVE-2020-7062 (bug #79221): with cleanup=0, END
-				 * stores into the progress array without checking that it exists
-				 * (NULL / IS_UNDEF dereference) before 7.2.28 / 7.3.15 / 7.4.3, which
-				 * skip that store. Releasing the key makes ext/session skip it as well;
-				 * php_rinit_session() has not run for this body, so the END clean-up
-				 * that is skipped along with it has nothing to release. */
-				if (event == MULTIPART_EVENT_END && !ps->rfc1867_cleanup && colopl_bc_security_suph_null_data_guard) {
+				/* No FILE_START has been processed yet, so php_rinit_session() has
+				 * not run for this body: releasing the key here makes ext/session
+				 * skip the upload without leaving anything to clean up. */
+				if (event == MULTIPART_EVENT_FILE_START && !colopl_bc_security_suph_key_encodable(ps, progress)) {
+					/* php_session_encode() would fail on every update(), and the
+					 * session is then saved as an empty string, wiping the data
+					 * stored under that ID. Such a key cannot be tracked anyway. */
+					smart_str_free(&progress->key);
+				} else if (event == MULTIPART_EVENT_END && !ps->rfc1867_cleanup && colopl_bc_security_suph_null_data_guard) {
+					/* CVE-2020-7062 (bug #79221): with cleanup=0, END stores into the
+					 * progress array without checking that it exists (NULL / IS_UNDEF
+					 * dereference) before 7.2.28 / 7.3.15 / 7.4.3, which skip that store. */
 					smart_str_free(&progress->key);
 				}
 				break;

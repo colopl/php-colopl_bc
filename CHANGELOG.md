@@ -1,3 +1,6 @@
+# 13.2.2
+- Add `colopl_bc.security.lock_session_serialize_handler` INI directive (default: `0`), which narrows `session.serialize_handler` to `PHP_INI_SYSTEM` so that the session decoding format cannot be changed per directory or at run time (handler-mismatch object injection)
+
 # 13.2.1
 - Add `colopl_bc.security.harden_session_upload_progress` INI directive, which wraps the `session.upload_progress` hook and rebinds the zval pointers that ext/session caches into its progress array before every event that writes through them (PHP 5.4+, separate PHP 5 / PHP 7+ code paths)
   - Enabled by default (`1`) on affected PHP versions: PHP <= 8.1 (every release), 8.2 <= 8.2.34, 8.3 <= 8.3.36, 8.4 <= 8.4.28, 8.5 <= 8.5.13; not compiled in (`0`) on other versions

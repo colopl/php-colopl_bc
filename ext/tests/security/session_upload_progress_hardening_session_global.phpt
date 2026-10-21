@@ -15,7 +15,7 @@ session.upload_progress.name=PHP_SESSION_UPLOAD_PROGRESS
 session.upload_progress.freq=1
 session.upload_progress.min_freq=0.000000001
 --SKIPIF--
-<?php include dirname(__FILE__) . '/skipif_hardening.inc'; ?>
+<?php include dirname(__FILE__) . '/skipif_hardening.inc'; include dirname(__FILE__) . '/skipif_upload_progress.inc'; ?>
 --COOKIE--
 PHPSESSID=colopl-bc-secfix-global
 --POST_RAW--

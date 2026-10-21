@@ -39,7 +39,7 @@ This extension provides, by default on affected versions: for (1), ending the wo
 
 ### Official minimal backports for PHP 7.4 / 8.0 / 8.1
 
-The branches linked above hold one commit each ("Avoid state corruption via bailout — Minimal mitigation for EOL version", by the PHP security team). Vendors have started shipping it; shivammathur/homebrew-php `php@8.1` 8.1.34_4 (used by setup-php on macOS) is one, and the Ubuntu 22.04 `php8.1` package behaves the same. **`PHP_VERSION` / `PHP_VERSION_ID` do not change** (the 7.4 branch even reports `7.4.31-dev`), so neither this extension nor your tooling can tell a backported build from a vulnerable one by version. What the backport does:
+The branches linked above hold one commit each ("Avoid state corruption via bailout — Minimal mitigation for EOL version", by the PHP security team). Vendors have started shipping it; shivammathur/homebrew-php `php@8.1` 8.1.34_4 (used by setup-php on macOS) is one, and the Ubuntu 22.04 `php8.1` update published the same day (8.1.2-1ubuntu2.28) shows the same behaviour in this repository's package build. **`PHP_VERSION` / `PHP_VERSION_ID` do not change** (the 7.4 branch even reports `7.4.31-dev`), so neither this extension nor your tooling can tell a backported build from a vulnerable one by version. What the backport does:
 
 | Official minimal backport (7.4 / 8.0 / 8.1) | This extension |
 |---|---|
@@ -57,7 +57,7 @@ The backport is not the fix of 8.2.35+: there is no unwinding exit and no class-
 Read this before deciding that a host is covered. This list is what is known today, not everything. On an unfixed PHP build with this extension loaded, the following remain:
 
 1. **Code runs before RINIT when the session is decoded.** The upstream fix decodes the session without resolving classes. An extension cannot do that, so objects stored in the session are instantiated before RINIT and their (internal-class) `__wakeup` / `__unserialize` run on uninitialized request state; `unserialize_callback_func`, if configured, is called as well. Reachable when an attacker can put objects into a session that gets decoded (serialize-handler mismatch, an application that stores attacker-controlled serialized data in the session, a known session ID).
-2. **Out-of-memory bailouts in general (mitigated since 13.4.0, see below).** The upstream fix replaces the `memory_limit` bailout (`longjmp()`) engine-wide because a request that is cut off while a structure is allocated but not yet initialized leaves that structure behind, and the request shutdown then reads it (the fix adds tests for `array_fill()`, `array_pad()`, `SplFixedArray`, date interval parsing, SOAP, `getimagesizefromstring()`, stream copies, unfinished call frames, ...). It is independent of `session.upload_progress` and of the SAPI: after such a fatal error a php-fpm worker keeps serving requests, so an attacker can retry against the same process. An extension cannot make the engine unwind safely; what it can do, and does since 13.4.0 with `colopl_bc.security.abort_on_memory_error=1` (default), is to end the process at the memory error so that nothing reads the corrupted state. `colopl_bc.security.abort_on_timeout=1` (default) does the same for `max_execution_time`, the other bailout that interrupts arbitrary code. Bailouts for other fatal errors are not covered.
+2. **Out-of-memory bailouts in general (mitigated since 13.4.0, see below).** The upstream fix replaces the `memory_limit` bailout (`longjmp()`) engine-wide because a request that is cut off while a structure is allocated but not yet initialized leaves that structure behind, and the request shutdown then reads it (the fix adds tests for `array_fill()`, `array_pad()`, `SplFixedArray`, date interval parsing, SOAP, `getimagesizefromstring()`, stream copies, unfinished call frames, ...). It is independent of `session.upload_progress` and of the SAPI: after such a fatal error a php-fpm worker keeps serving requests, so an attacker can retry against the same process. An extension cannot make the engine unwind safely; what it can do, and does since 13.4.0 with `colopl_bc.security.abort_on_memory_error=1` (default), is to end the process at the memory error so that nothing reads the corrupted state. `colopl_bc.security.abort_on_timeout=1` (default) does the same for `max_execution_time`, which on PHP 5.4 - 7.0 is the other bailout that can start inside arbitrary code (since 7.1 it starts only at interrupt checks; see [its section](#colopl_bcsecurityabort_on_timeout-default-1)). Bailouts for other fatal errors are not covered.
 3. **Stale request state other than the session's** (the `$_GET` / `$_POST` globals, SAPI request info, error handlers, `PG(modules_activated)`, ...) is not reset; the upstream fix and the EOL backports reset it in the request lifecycle. Nor is the URL rewriter (`session.use_trans_sid`) state reset at the start of the body.
 4. **Memory exhaustion by multipart headers / parts** is not limited (the upstream fix de-duplicates headers and checks `post_max_size` early; the backports add `max_multipart_body_parts`). Limit it at the web server (`LimitRequestBody`, `client_max_body_size`) and with `post_max_size` / `max_multipart_body_parts`.
 5. **The session wrapper is only installed when the running PHP matches the headers the extension was built against** (version range and `php_ps_globals` size). Distribution patches, a build reused on another release, ZTS or Windows (untested) can leave it `inactive` without any error. `php -i | grep "pointer hardening"` must say `active`; otherwise none of the session mitigations apply.
@@ -109,7 +109,7 @@ upstream の修正は 2 本立てです。(1) エンジン全体で、OOM 時の
 
 ### 公式の最小バックポート (PHP 7.4 / 8.0 / 8.1)
 
-上記のブランチはそれぞれ 1 コミット (「Avoid state corruption via bailout — Minimal mitigation for EOL version」、PHP セキュリティチーム) です。ベンダーの配布は始まっています。shivammathur/homebrew-php の `php@8.1` 8.1.34_4 (macOS の setup-php が使用) がその一つで、Ubuntu 22.04 の `php8.1` 8.1.2-1ubuntu2.28 (2026-10-21 公開) も同じ挙動をします。**`PHP_VERSION` / `PHP_VERSION_ID` は変わりません** (7.4 ブランチは `7.4.31-dev` を名乗ります) ので、本拡張にも運用ツールにも、バックポート済みビルドと脆弱なビルドをバージョンで見分けることはできません。バックポートの内容:
+上記のブランチはそれぞれ 1 コミット (「Avoid state corruption via bailout — Minimal mitigation for EOL version」、PHP セキュリティチーム) です。ベンダーの配布は始まっています。shivammathur/homebrew-php の `php@8.1` 8.1.34_4 (macOS の setup-php が使用) がその一つで、同日に公開された Ubuntu 22.04 の `php8.1` 更新 (8.1.2-1ubuntu2.28) も本リポジトリのパッケージビルドで同じ挙動を示します。**`PHP_VERSION` / `PHP_VERSION_ID` は変わりません** (7.4 ブランチは `7.4.31-dev` を名乗ります) ので、本拡張にも運用ツールにも、バックポート済みビルドと脆弱なビルドをバージョンで見分けることはできません。バックポートの内容:
 
 | 公式の最小バックポート (7.4 / 8.0 / 8.1) | 本拡張 |
 |---|---|
@@ -127,7 +127,7 @@ upstream の修正は 2 本立てです。(1) エンジン全体で、OOM 時の
 ホストが保護されていると判断する前に必ず読んでください。この一覧は現時点で分かっていることであり、すべてではありません。未修正の PHP に本拡張を読み込んでも、以下は残ります。
 
 1. **セッション復号時に RINIT 前でコードが走る。** upstream はクラス解決なしで復号しますが、拡張にはできません。セッションに保存されたオブジェクトは RINIT 前に復元され、(内部クラスの) `__wakeup` / `__unserialize` が未初期化のリクエスト状態の上で走ります。`unserialize_callback_func` が設定されていればそれも呼ばれます。攻撃者が復号対象のセッションにオブジェクトを置ける場合 (serialize handler の不一致、攻撃者制御のシリアライズ値をセッションに書くアプリ、既知のセッション ID) に到達します。
-2. **OOM による bailout 全般 (13.4.0 以降は緩和あり、後述)。** upstream が `memory_limit` 超過時の bailout (`longjmp()`) をエンジン全体で置き換えたのは、構造を確保して初期化し切る前に打ち切られたリクエストがその構造を残し、リクエスト終了処理がそれを読むためです (修正は `array_fill()`、`array_pad()`、`SplFixedArray`、日付間隔の解析、SOAP、`getimagesizefromstring()`、ストリームのコピー、未完了の呼び出しフレームなどのテストを追加しています)。`session.upload_progress` とも SAPI とも無関係で、この fatal の後も php-fpm のワーカーは生き続けるため、攻撃者は同じプロセスに対して何度でも試行できます。拡張にはエンジンを安全に巻き戻させることはできませんが、13.4.0 以降は `colopl_bc.security.abort_on_memory_error=1` (デフォルト) により、メモリエラーの時点でプロセスを終了させて壊れた状態を誰にも読ませないようにします。`colopl_bc.security.abort_on_timeout=1` (デフォルト) は、任意のコードを中断するもう一つの bailout である `max_execution_time` に同じ扱いをします。その他の fatal error による bailout は対象外です。
+2. **OOM による bailout 全般 (13.4.0 以降は緩和あり、後述)。** upstream が `memory_limit` 超過時の bailout (`longjmp()`) をエンジン全体で置き換えたのは、構造を確保して初期化し切る前に打ち切られたリクエストがその構造を残し、リクエスト終了処理がそれを読むためです (修正は `array_fill()`、`array_pad()`、`SplFixedArray`、日付間隔の解析、SOAP、`getimagesizefromstring()`、ストリームのコピー、未完了の呼び出しフレームなどのテストを追加しています)。`session.upload_progress` とも SAPI とも無関係で、この fatal の後も php-fpm のワーカーは生き続けるため、攻撃者は同じプロセスに対して何度でも試行できます。拡張にはエンジンを安全に巻き戻させることはできませんが、13.4.0 以降は `colopl_bc.security.abort_on_memory_error=1` (デフォルト) により、メモリエラーの時点でプロセスを終了させて壊れた状態を誰にも読ませないようにします。`colopl_bc.security.abort_on_timeout=1` (デフォルト) は `max_execution_time` に同じ扱いをします (PHP 5.4 - 7.0 ではこれも任意のコードの途中で始まり得る bailout です。7.1 以降は interrupt check でのみ始まります。詳細は [当該節](#colopl_bcsecurityabort_on_timeout-default-1))。その他の fatal error による bailout は対象外です。
 3. **セッション以外の残留リクエスト状態** (`$_GET` / `$_POST` のグローバル、SAPI のリクエスト情報、エラーハンドラ、`PG(modules_activated)` など) はリセットしません。upstream の修正と EOL 向けバックポートはリクエストライフサイクルの中でこれらをリセットしています。URL 書き換え (`session.use_trans_sid`) の状態も本文開始時にリセットしません。
 4. **multipart のヘッダ・パート数によるメモリ枯渇**は制限しません (upstream はヘッダの重複排除と `post_max_size` の早期チェックを追加し、バックポートは `max_multipart_body_parts` を追加)。Web サーバ側 (`LimitRequestBody`、`client_max_body_size`) と `post_max_size` / `max_multipart_body_parts` で制限してください。
 5. **セッションのラッパは、実行中の PHP がビルド時のヘッダと一致する場合にだけ組み込まれます** (バージョン範囲と `php_ps_globals` のサイズ)。ディストリビューションの独自パッチ、別リリースへのビルドの流用、ZTS や Windows (未検証) では、エラーなしに `inactive` になり得ます。`php -i | grep "pointer hardening"` が `active` でなければ、セッション関連の緩和はどれも効いていません。
@@ -215,6 +215,7 @@ Default-value policy:
 
 - A mitigation that re-implements the upstream fix while keeping the feature functional is enabled by default (`1`) when it cannot change the behaviour of valid input.
 - A mitigation that can only work by disabling a feature is disabled by default (`0`) and must be opted in.
+- A mitigation that only changes how an already failed request fails (process exit instead of a bailout) is enabled by default (`1`); it has no effect on requests that complete.
 
 ### `colopl_bc.security.disable_session_upload_progress` (default: `0`)
 
@@ -225,7 +226,7 @@ Detaches the `session.upload_progress` feature from the multipart/form-data pars
 
 This is an opt-in, feature-disabling mitigation: unlike `session.upload_progress.enabled=0` it is enforced in the engine and cannot be re-enabled per directory or at runtime. Note that the hook is shared with any other extension that chains into `php_rfc1867_callback` (for example PECL `uploadprogress`); those are detached as well.
 
-Applies to PHP >= 5.4 (where `session.upload_progress` exists). Once an upstream fix is published, the mitigation will become a no-op on fixed PHP builds.
+Applies to PHP >= 5.4 (where `session.upload_progress` exists), on fixed releases too: it is a feature switch, not a version-gated mitigation. On a 7.4 / 8.0 / 8.1 build with the [official minimal backport](#official-minimal-backports-for-php-74--80--81) the feature is already off and this changes nothing.
 
 ### `colopl_bc.security.harden_session_upload_progress` (default: `1` on affected PHP versions)
 
@@ -267,7 +268,7 @@ Runs every `unserialize()` call with `ext/standard`'s `serialize_lock` held, so 
 - `0`: not applied.
 - `1`: applied. `unserialize()` results, references inside one string and the supported nested calls are unchanged. A destructor-started nested `unserialize()` with a back-reference into the outer call fails as if the reference did not exist, which was never a supported use.
 
-Enabled by default because the supported nested entry points already run under the lock and valid input is unaffected; the wrapper is only installed on PHP versions the extension considers affected (currently every version, to be narrowed once the upstream fix for the 2026-10-21 security release is published). Note that it wraps the `unserialize()` function only; internal callers such as session decoding are not wrapped, but a nested `unserialize()` started from them goes through the wrapper and is isolated.
+Enabled by default because the supported nested entry points already run under the lock and valid input is unaffected; the wrapper is installed on every PHP version: the 2026-10-21 security release did not change how nested `unserialize()` calls share their state, so there is no fixed release to exclude. Note that it wraps the `unserialize()` function only; internal callers such as session decoding are not wrapped, but a nested `unserialize()` started from them goes through the wrapper and is isolated.
 
 ### `colopl_bc.security.abort_on_memory_error` (default: `1`)
 
@@ -276,11 +277,18 @@ Ends the process when an allocation fails because of `memory_limit` or because t
 - `0`: not applied. A memory error bails out as before.
 - `1`: applied. A memory error ends the worker; php-fpm, Apache (prefork) and CGI-style SAPIs start a new one, the client sees a dropped connection or a 502 instead of a 500.
 
-Enabled by default because a request that hit `memory_limit` has already failed; what changes is only how it fails. What is lost for that request: shutdown functions (including custom out-of-memory error pages), destructors, the session write, output buffers not yet flushed, and the deletion of temporary upload files. In a threaded SAPI (ZTS: Apache worker/event, Windows) the whole process with all its threads ends. If any of this matters more than the memory-safety of unfixed PHP builds, set it to `0`. Applies to every PHP version (5.4+); on PHP 5 the error is logged by the extension itself, as the original callback cannot be asked not to bail out. On a build with the [official minimal backport](#official-minimal-backports-for-php-74--80--81) for 7.4 / 8.0 / 8.1 the engine already ends the process on a memory error before the error callback is reached, so this directive has no effect there (and nothing is logged or displayed; the line goes to stderr).
+Enabled by default because a request that hit `memory_limit` has already failed; what changes is only how it fails. What is lost for that request: shutdown functions (including custom out-of-memory error pages), destructors, the session write, output buffers not yet flushed, and the deletion of temporary upload files. In a threaded SAPI (ZTS: Apache worker/event, Windows) the whole process with all its threads ends. If any of this matters more than the memory-safety of unfixed PHP builds, set it to `0`. Applies to every PHP version (5.4+); on PHP 5.4 - 7.3 (no `E_DONT_BAIL`) the error is logged and displayed by the extension itself, in `php_error_cb()`'s formats, as the original callback cannot be asked not to bail out. On a build with the [official minimal backport](#official-minimal-backports-for-php-74--80--81) for 7.4 / 8.0 / 8.1 the engine already ends the process on a memory error before the error callback is reached, so this directive has no effect there (and nothing is logged or displayed; the line goes to stderr).
 
 ### `colopl_bc.security.abort_on_timeout` (default: `1`)
 
-The same treatment for the `max_execution_time` fatal error: `zend_timeout()` interrupts whatever is running (before PHP 7.1 straight from the signal handler, since then at the next interrupt check, still in the middle of the internal function that was running) and bails out through the same `zend_error_cb` path. With `1` the error is logged and displayed as usual and the process ends with `_exit(255)`; with `0` it bails out as before. The same losses as for `colopl_bc.security.abort_on_memory_error` apply to that request. Shares the callback with `abort_on_memory_error`; either directive installs it.
+The same treatment for the `max_execution_time` fatal error, which bails out through the same `zend_error_cb` path: with `1` the error is logged and displayed as usual and the process ends with `_exit(255)`; with `0` it bails out as before. The same losses as for `colopl_bc.security.abort_on_memory_error` apply to that request. Shares the callback with `abort_on_memory_error`; either directive installs it.
+
+The upstream fix has no equivalent: it deliberately leaves `zend_timeout()` as a bailout (the delayed out-of-memory handling it adds sits right next to it in the interrupt helper). Where a timeout can interrupt differs by version, and with it what this directive buys:
+
+- PHP 5.4 - 7.0: `zend_timeout()` is called from the `SIGPROF` handler itself, so the bailout can start anywhere, inside the allocator or in the middle of building a structure: the same hazard class as the memory error. Here the directive is a real mitigation, and these versions have no `hard_timeout`.
+- PHP 7.1+: the signal handler only sets `EG(timed_out)` and the VM interrupt flag; the bailout starts at the next interrupt check, i.e. between two opcodes or in `zend_call_function()` after a user callback returned to an internal function. C code has to be exception-safe at those points already, so what a bailout leaves behind there is what any fatal error leaves behind (unfinished frames, per-request flags that RINIT resets), not a half-built structure. A timeout that is not acted on within `hard_timeout` seconds (default `2`) already ends the process from the signal handler (`_exit`, message to stderr): that is upstream's own answer to a timeout inside C code. On these versions the directive is belt and braces: it applies the hard-timeout treatment at the first opportunity and on every SAPI, at the cost of the shutdown processing listed above.
+
+Enabled by default for the same reason as `abort_on_memory_error`: the request has already failed, only the way it fails changes. Set it to `0` if a timed-out request must still run its shutdown functions (an error page, for instance) or if worker churn on a slow endpoint matters more; on PHP 7.1+ `hard_timeout` then remains the upstream backstop.
 
 ## API references
 
@@ -302,21 +310,25 @@ Compares the result with the result of a native PHP operator and raises an error
 
 Compares the results of native PHP operators and sends a log to the running SAPI if the results are different.
 
+The values are bit flags and can be combined: `3` raises the deprecation and sends the log.
+
 #### `colopl_bc.php74.sort_mode` (default: `0`)
 
 Sets the compatibility check mode for various unstable sort algorithms.
 
-- 0 (`COLOPL_BC_PHP74_COMPARE_MODE_SILENT`)
+- 0 (`COLOPL_BC_PHP74_SORT_MODE_SILENT`)
 
 It does not perform compatibility checks and always uses the results of older behavior. Suitable for use in production environments.
 
-- 1 (`COLOPL_BC_PHP74_COMPARE_MODE_DEPRECATED`)
+- 1 (`COLOPL_BC_PHP74_SORT_MODE_DEPRECATED`)
 
 Compares the result with the result of a native PHP function and raises an error equivalent to `E_DEPRECATED` if the results are different.
 
-- 2 (`COLOPL_BC_PHP74_COMPARE_MODE_LOG`)
+- 2 (`COLOPL_BC_PHP74_SORT_MODE_LOG`)
 
 Compares the results of native PHP functions and sends a log to the running SAPI if the results are different.
+
+The values are bit flags and can be combined: `3` raises the deprecation and sends the log.
 
 ### Constants
 
@@ -324,10 +336,10 @@ Please check the settings of the corresponding ini directives.
 
 - `COLOPL_BC_PHP74_COMPARE_MODE_SILENT` = 0
 - `COLOPL_BC_PHP74_COMPARE_MODE_DEPRECATED` = 1
-- `COLOPL_BC_PHP75_COMPARE_MODE_LOG` = 2
+- `COLOPL_BC_PHP74_COMPARE_MODE_LOG` = 2
 - `COLOPL_BC_PHP74_SORT_MODE_SILENT` = 0
 - `COLOPL_BC_PHP74_SORT_MODE_DEPRECATED` = 1
-- `COLOPL_BC_PHP75_SORT_MODE_LOG` = 2
+- `COLOPL_BC_PHP74_SORT_MODE_LOG` = 2
 
 ### Functions
 

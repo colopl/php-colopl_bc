@@ -30,7 +30,7 @@
 
 #include "php_colopl_bc_security.h"
 
-#define PHP_COLOPL_BC_VERSION "13.4.1"
+#define PHP_COLOPL_BC_VERSION "13.5.0"
 
 extern zend_module_entry colopl_bc_module_entry;
 #define phpext_colopl_bc_ptr &colopl_bc_module_entry

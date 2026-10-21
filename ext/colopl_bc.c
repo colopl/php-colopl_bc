@@ -42,6 +42,15 @@ PHP_MSHUTDOWN_FUNCTION(colopl_bc)
 	return colopl_bc_security_mshutdown(SHUTDOWN_FUNC_ARGS_PASSTHRU);
 }
 
+PHP_RINIT_FUNCTION(colopl_bc)
+{
+#if defined(ZTS) && defined(COMPILE_DL_COLOPL_BC) && PHP_VERSION_ID >= 70000
+	ZEND_TSRMLS_CACHE_UPDATE();
+#endif
+
+	return SUCCESS;
+}
+
 PHP_MINFO_FUNCTION(colopl_bc)
 {
 	php_info_print_table_start();
@@ -60,11 +69,13 @@ zend_module_entry colopl_bc_module_entry = {
 	NULL,
 	PHP_MINIT(colopl_bc),
 	PHP_MSHUTDOWN(colopl_bc),
-	NULL,
+	PHP_RINIT(colopl_bc),
 	NULL,
 	PHP_MINFO(colopl_bc),
 	PHP_COLOPL_BC_VERSION,
-	STANDARD_MODULE_PROPERTIES
+	NO_MODULE_GLOBALS,
+	colopl_bc_security_post_deactivate,
+	STANDARD_MODULE_PROPERTIES_EX
 };
 
 #else	/* COLOPL_BC_SECURITY_ONLY */
@@ -147,7 +158,7 @@ zend_module_entry colopl_bc_module_entry = {
 	PHP_MODULE_GLOBALS(colopl_bc),
 	PHP_GINIT(colopl_bc),
 	NULL,
-	NULL,
+	colopl_bc_security_post_deactivate,
 	STANDARD_MODULE_PROPERTIES_EX
 };
 

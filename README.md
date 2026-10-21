@@ -157,12 +157,20 @@ Keeps `session.upload_progress` functional while removing the stale-pointer clas
 
 When the running PHP is older than 7.2.28 / 7.3.15 / 7.4.3 (including every PHP 5.4 - 7.1 release), the wrapper also guards CVE-2020-7062 (bug #79221): with `cleanup=0`, a body that carries the session ID and the progress key but no file part makes `ext/session` store into a progress array that was never created at the end of the upload, which crashes the process. The guard makes `ext/session` skip that store, as the fixed releases do. `phpinfo()` reports it as `session.upload_progress CVE-2020-7062 guard`.
 
+The wrapper also carries the parts of the 2026-10-21 upstream fix that an extension can provide:
+
+- At the start of every multipart body it resets the (un)serializer state of `ext/standard` (`serialize_lock`, nesting state) and the request state of `ext/session` (session ID, status, save handler data, `$_SESSION` storage), as the fixed releases do. The multipart parser runs before RINIT, so without this a request that follows a bailout of the previous request in the same process runs the upload progress handler on stale globals.
+- After the body it removes the `$_SESSION` global that the upload progress handler populated before RINIT, so the script starts without it (as in the fixed releases); `session_start()` loads the session as usual.
+- On PHP 8.4+, multipart events delivered after RINIT (`request_parse_body()`) are not forwarded to `ext/session`, as in the fixed releases.
+
+Two parts of the upstream fix cannot be provided by an extension: the engine-wide replacement of the out-of-memory bailout by an unwinding exit, and decoding the session before RINIT without resolving any class (`__PHP_Incomplete_Class` with the original payload preserved), which needs the new unserializer mode. With this extension the pre-RINIT decode still instantiates objects stored in the session; `colopl_bc.security.disable_session_upload_progress=1` removes that code path entirely and is the complete mitigation on unfixed PHP builds.
+
 The wrapper also closes two logic gaps of the hook that public proof-of-concept code relies on:
 
 - With `session.use_only_cookies=1`, a form field named after the session (`PHPSESSID`) in the multipart body is no longer taken as the session ID of the progress record. `session_start()` never takes the session ID from the request body in that configuration, so only requests that rely on the inconsistency are affected; the field still reaches `$_POST`, and `session.use_only_cookies=0` keeps the previous behaviour.
 - With the `php` serializer (`session.serialize_handler=php`, the default), a progress key containing `|` (and `!` before PHP 7.2) is not tracked. Such a key makes `php_session_encode()` fail on every progress update, and the session is then saved as an empty string, wiping the data stored under that session ID.
 
-Affected PHP versions (compiled in and enabled by default): PHP <= 8.1 (every release), PHP 8.2 <= 8.2.34, PHP 8.3 <= 8.3.36, PHP 8.4 <= 8.4.28, PHP 8.5 <= 8.5.13. On other versions the mitigation is not compiled in and the directive defaults to `0`. Because the callback's data layout is taken from the PHP headers used at build time, the wrapper is also only installed when the *running* PHP version is affected and the session globals match those headers; otherwise `phpinfo()` reports it as `inactive` with the reason. It is not installed when `colopl_bc.security.disable_session_upload_progress=1` has already detached the hook.
+Affected PHP versions (compiled in and enabled by default): PHP <= 8.1 (every release), PHP 8.2 < 8.2.35, PHP 8.3 < 8.3.36, PHP 8.4 < 8.4.27, PHP 8.5 < 8.5.12, i.e. every release before the 2026-10-21 security release (GHSA-w8hw-w9fx-j79w / GHSA-6wmf-4rv5-p3rp, CVE-2026-109618 / CVE-2026-109619). On other versions the mitigation is not compiled in and the directive defaults to `0`. Because the callback's data layout is taken from the PHP headers used at build time, the wrapper is also only installed when the *running* PHP version is affected and the session globals match those headers; otherwise `phpinfo()` reports it as `inactive` with the reason. It is not installed when `colopl_bc.security.disable_session_upload_progress=1` has already detached the hook.
 
 ### `colopl_bc.security.lock_session_serialize_handler` (default: `0`)
 

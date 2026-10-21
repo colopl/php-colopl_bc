@@ -50,17 +50,19 @@
 #endif
 
 /*
- * PHP versions whose ext/session upload progress callback dereferences the
- * zval pointers it caches into its progress array (see colopl_bc_security.c).
- * PHP <= 8.1 is affected on every release; PHP 8.2 - 8.5 up to and including
- * the listed release of each branch. Usable both in #if and at runtime.
+ * PHP versions whose ext/session upload progress callback runs before the
+ * 2026-10-21 security release (GHSA-w8hw-w9fx-j79w / GHSA-6wmf-4rv5-p3rp,
+ * CVE-2026-109618 / CVE-2026-109619, fixed in 8.2.35 / 8.3.36 / 8.4.27 /
+ * 8.5.12): it dereferences the zval pointers it caches into its progress
+ * array, decodes the session before RINIT with stale globals and user code
+ * enabled, and leaves $_SESSION behind (see colopl_bc_security.c). PHP <= 8.1
+ * is affected on every release. Usable both in #if and at runtime.
  */
 #define COLOPL_BC_SECURITY_SESSION_UPLOAD_PROGRESS_POINTERS_AFFECTED(id) ( \
-	(id) < 80200 || \
-	((id) >= 80200 && (id) < 80300 && (id) <= 80234) || \
-	((id) >= 80300 && (id) < 80400 && (id) <= 80336) || \
-	((id) >= 80400 && (id) < 80500 && (id) <= 80428) || \
-	((id) >= 80500 && (id) < 80600 && (id) <= 80513) \
+	(id) < 80235 || \
+	((id) >= 80300 && (id) < 80336) || \
+	((id) >= 80400 && (id) < 80427) || \
+	((id) >= 80500 && (id) < 80512) \
 )
 
 /*

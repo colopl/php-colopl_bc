@@ -4,7 +4,7 @@
   - At the start of every multipart body the hardening wrapper resets the (un)serializer state of ext/standard and the request state of ext/session, as the fixed releases do, so that a request that follows a bailout does not run the upload progress handler on stale globals
   - After the body the `$_SESSION` global populated before RINIT by the upload progress handler is removed again, as the fixed releases do
   - On PHP 8.4+, multipart events delivered after RINIT (`request_parse_body()`) are no longer forwarded to ext/session, as the fixed releases do
-- Document which parts of the upstream fix cannot be provided by an extension (OOM bailout replacement in the engine, decoding the session without resolving classes before RINIT) and that `colopl_bc.security.disable_session_upload_progress=1` is the complete mitigation for the latter
+- README: state explicitly that the extension is an emergency stopgap and not a response to the CVEs (the fix is the PHP security release), list what it cannot do (pre-RINIT class resolution, engine-wide OOM handling, URL rewriter state, multipart memory exhaustion, builds on which the wrapper is inactive, application-level `unserialize()`), and that `colopl_bc.security.disable_session_upload_progress=1` is the only setting that closes the session paths on unfixed builds
 
 # 13.2.3
 - Add `colopl_bc.security.isolate_unserialize` INI directive (default: `1`), which runs `unserialize()` with `serialize_lock` held so that nested calls started from destructors never share the outer call's back-reference / delayed-call state

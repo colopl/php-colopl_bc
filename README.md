@@ -8,66 +8,100 @@ Provides various compatibility functions required for PHP (temporary) migration.
 ## Security notice: `session.upload_progress` (2026-10-21)
 
 > [!CAUTION]
-> **DO NOT RELY ON THIS EXTENSION FOR SECURITY. THE MITIGATIONS BELOW ARE A TEMPORARY, BEST-EFFORT STOPGAP AND ARE NOT A REPLACEMENT FOR THE OFFICIAL PHP SECURITY RELEASE. UPGRADE PHP TO A SUPPORTED, PATCHED RELEASE AS SOON AS POSSIBLE. IF YOU RUN AN END-OF-LIFE PHP VERSION (5.4 - 8.1), MIGRATE TO A SUPPORTED VERSION.**
+> **THIS EXTENSION IS NOT A SECURITY FIX. DO NOT USE IT AS YOUR RESPONSE TO CVE-2026-109618 / CVE-2026-109619.**
+>
+> **The only fix is the PHP security release of 2026-10-21: PHP 8.2.35, 8.3.36, 8.4.27 or 8.5.12 (or later). Upgrade to it. If you run an end-of-life PHP version (5.4 - 8.1), migrate to a supported version: no complete fix exists for those releases, in this extension or anywhere else.**
+>
+> **What this extension provides is an emergency stopgap for the days between the disclosure and your upgrade. It cannot reproduce the upstream fix (see "What this extension cannot do" below), it has not been reviewed by the PHP security team, and it is silently inactive on builds whose session globals do not match the headers it was built against. Treat a host that relies on it as still vulnerable.**
 
 > [!IMPORTANT]
-> Since **13.2.1**, loading this extension hardens the `session.upload_progress` handling of `ext/session` **by default** on affected PHP versions, including EOL releases that will not receive an upstream fix (PHP 5.4 - 8.1). No configuration change is needed.
+> Since **13.2.1**, loading this extension hardens the `session.upload_progress` handling of `ext/session` **by default** on affected PHP versions, including EOL releases that will not receive an upstream fix (PHP 5.4 - 8.1). No configuration change is needed. Since **13.3.0** the mitigations follow the published upstream fix where an extension can.
 >
-> **Targeted CVEs:**
->
-> - **CVE-2026-109618 / CVE-2026-109619** (presumed): the upstream advisory and fix had not been published when this mitigation was written, so the mapping is based on the public reports and proof-of-concept code.
-> - **CVE-2020-7062**: on PHP older than 7.2.28 / 7.3.15 / 7.4.3, including every PHP 5.4 - 7.1 release.
+> **CVEs:** CVE-2026-109618 / CVE-2026-109619 (GHSA-w8hw-w9fx-j79w / GHSA-6wmf-4rv5-p3rp, php-src commit 01a40e89, "Avoid state corruption via bailout"). On PHP older than 7.2.28 / 7.3.15 / 7.4.3 the same wrapper also guards CVE-2020-7062.
 
-This relates to the PHP security release scheduled for 2026-10-21 (publicly reported as CVE-2026-109618 / CVE-2026-109619) and the proof-of-concept code published for it, which targets the zval pointers that the upload progress callback caches into its progress array. The extension rebinds those pointers before every multipart event so that they can never point at a stale copy, while keeping `session.upload_progress` functional. On PHP older than 7.2.28 / 7.3.15 / 7.4.3 it also prevents the crash of CVE-2020-7062 in the same code path. It also stops the progress hook from taking the session ID from the request body when `session.use_only_cookies=1`, and from saving a session it cannot encode (which wipes it). The upstream fix had not been published when this mitigation was written; it will be re-evaluated once it is.
+The upstream fix has two parts. (1) Engine-wide, the out-of-memory bailout is replaced by an unwinding exit so that a request that hits `memory_limit` can no longer leave half-initialized structures behind. (2) The `session.upload_progress` handler, which runs before RINIT, is made safe: the (un)serializer and session request state are reset at the start of every multipart body, the session is decoded without resolving any class (`__PHP_Incomplete_Class`, payload preserved), events delivered after RINIT are ignored, and the pre-RINIT `$_SESSION` is dropped at the end of the body.
+
+This extension provides, by default on affected versions: the state reset at the start of the body, the `$_SESSION` cleanup, the post-RINIT guard, plus the earlier hardening (pointer rebinding, no session ID from the body with `session.use_only_cookies=1`, no tracking of keys the serializer cannot store). See [Security backports](#security-backports).
 
 | PHP | `colopl_bc.security.harden_session_upload_progress` |
 |---|---|
 | 5.4 - 8.1 | every release: enabled by default (`1`) |
-| 8.2 | <= 8.2.34: enabled by default (`1`) |
-| 8.3 | <= 8.3.36: enabled by default (`1`) |
-| 8.4 | <= 8.4.28: enabled by default (`1`) |
-| 8.5 | <= 8.5.13: enabled by default (`1`) |
-| other releases | not compiled in (`0`) |
+| 8.2 | < 8.2.35: enabled by default (`1`) |
+| 8.3 | < 8.3.36: enabled by default (`1`) |
+| 8.4 | < 8.4.27: enabled by default (`1`) |
+| 8.5 | < 8.5.12: enabled by default (`1`) |
+| fixed releases | not compiled in (`0`): nothing to do, PHP is fixed |
+
+### What this extension cannot do
+
+Read this before deciding that a host is covered. On an unfixed PHP build with this extension loaded, the following remain:
+
+1. **Code runs before RINIT when the session is decoded.** The upstream fix decodes the session without resolving classes. An extension cannot do that, so objects stored in the session are instantiated before RINIT and their (internal-class) `__wakeup` / `__unserialize` run on uninitialized request state; `unserialize_callback_func`, if configured, is called as well. Reachable when an attacker can put objects into a session that gets decoded (serialize-handler mismatch, an application that stores attacker-controlled serialized data in the session, a known session ID).
+2. **Out-of-memory during the request itself.** The engine-wide bailout replacement cannot be provided by an extension. The state reset only protects the *next* multipart request on the same process (mod_php, LiteSpeed); everything else the upstream fix made OOM-safe (hash tables, strings, JSON, mbstring, streams, ...) is unchanged.
+3. **URL rewriter (`session.use_trans_sid`) state** is not reset at the start of the body; the upstream fix resets it with a new internal function.
+4. **Memory exhaustion by multipart headers / parts** is not limited (the upstream fix de-duplicates headers and checks `post_max_size` early). Limit it at the web server (`LimitRequestBody`, `client_max_body_size`) and with `post_max_size` / `max_multipart_body_parts`.
+5. **The wrapper is only installed when the running PHP matches the headers the extension was built against** (version range and `php_ps_globals` size). Distribution patches, a build reused on another release, ZTS or Windows (untested) can leave it `inactive` without any error. `php -i | grep "pointer hardening"` must say `active`; otherwise none of the session mitigations apply.
+6. **`unserialize()` of untrusted input in the application** is object injection regardless of this extension; `colopl_bc.security.isolate_unserialize` only removes one memory-safety primitive from it.
+
+The one setting that closes 1 - 4 on an unfixed build is `colopl_bc.security.disable_session_upload_progress=1` (or `session.upload_progress.enabled=0`), at the cost of the upload progress feature. It does not close 2 for code paths outside the session handler, and it does not close 6.
 
 What to do:
 
-1. Upgrade to colopl_bc 13.2.1 or later and load the extension (for every SAPI, e.g. php-fpm, Apache, CLI).
-2. Check that the mitigation is active: `php -i | grep "pointer hardening"` must report `active (php_rfc1867_callback wrapped)`. When it reports `inactive`, the reason is shown in parentheses.
-3. Still upgrade PHP to a fixed release where one is available. If your application does not use upload progress at all, `session.upload_progress.enabled=0` or `colopl_bc.security.disable_session_upload_progress=1` removes the feature entirely.
+1. **Upgrade PHP to a fixed release.** This is the fix. Everything below is for the time until that is done.
+2. Until then, load colopl_bc 13.3.0 or later in every SAPI (php-fpm, Apache, CLI) and set `colopl_bc.security.disable_session_upload_progress=1` unless the application needs upload progress.
+3. Check that the mitigation is active on every host: `php -i | grep "pointer hardening"` must report `active (php_rfc1867_callback wrapped)`; `inactive` shows the reason in parentheses and means the host is not covered.
+4. Plan the removal of this stopgap together with the PHP upgrade; do not keep it as the long-term answer.
 
-Compatibility: upload progress entries are created and updated as before. With `session.upload_progress.cleanup=0` on PHP 7.2+, the final `bytes_processed` is the total that was read instead of a stale value. Uploads are not tracked when, with `session.use_only_cookies=1`, the session ID only comes from the request body, or when the progress key contains a character the `php` serializer cannot store (`|`); neither case works correctly today. See [Security backports](#security-backports) for details.
+Compatibility: upload progress entries are created and updated as before. With `session.upload_progress.cleanup=0` on PHP 7.2+, the final `bytes_processed` is the total that was read instead of a stale value. Uploads are not tracked when, with `session.use_only_cookies=1`, the session ID only comes from the request body, or when the progress key contains a character the `php` serializer cannot store (`|`); neither case works correctly today. `$_SESSION` is no longer populated before `session_start()` after an upload (as in the fixed releases). See [Security backports](#security-backports) for details.
 
 ## セキュリティ対応について: `session.upload_progress` (2026-10-21)
 
 > [!CAUTION]
-> **セキュリティ対策を本拡張に頼らないでください。以下の緩和は一時的かつベストエフォートの応急処置であり、PHP 公式のセキュリティリリースの代わりにはなりません。できるだけ早く、サポート中で修正済みの PHP リリースへ更新してください。EOL の PHP (5.4 - 8.1) を使っている場合は、サポート中のバージョンへ移行してください。**
+> **本拡張はセキュリティ修正ではありません。CVE-2026-109618 / CVE-2026-109619 への対応として本拡張を使わないでください。**
+>
+> **唯一の修正は 2026-10-21 の PHP セキュリティリリース (PHP 8.2.35 / 8.3.36 / 8.4.27 / 8.5.12 以降) です。これに更新してください。EOL の PHP (5.4 - 8.1) を使っている場合は、サポート中のバージョンへ移行してください。それらのリリースに対する完全な修正は、本拡張にも他のどこにも存在しません。**
+>
+> **本拡張が提供するのは、公開から更新までの数日をしのぐための緊急避難です。upstream の修正を再現することはできず (後述「本拡張にできないこと」)、PHP セキュリティチームのレビューも受けておらず、ビルド時のヘッダとセッションのグローバル構造が一致しないビルドでは何も言わずに無効になります。本拡張に頼っているホストは、依然として脆弱なものとして扱ってください。**
 
 > [!IMPORTANT]
-> **13.2.1** 以降、本拡張を読み込むと、影響を受ける PHP バージョンで `ext/session` の `session.upload_progress` 処理が **デフォルトで** 堅牢化されます。upstream の修正が提供されない EOL バージョン (PHP 5.4 - 8.1) も対象です。設定変更は不要です。
+> **13.2.1** 以降、本拡張を読み込むと、影響を受ける PHP バージョンで `ext/session` の `session.upload_progress` 処理が **デフォルトで** 堅牢化されます。upstream の修正が提供されない EOL バージョン (PHP 5.4 - 8.1) も対象です。設定変更は不要です。**13.3.0** 以降は、公開された upstream の修正のうち拡張から再現できる部分に追従しています。
 >
-> **対応を想定している CVE:**
->
-> - **CVE-2026-109618 / CVE-2026-109619** (推定): 本緩和の作成時点では upstream のアドバイザリと修正が未公開のため、公開されている報道と PoC に基づく対応付けです。
-> - **CVE-2020-7062**: 7.2.28 / 7.3.15 / 7.4.3 より古い PHP (PHP 5.4 - 7.1 の全リリースを含む) が対象です。
+> **対象 CVE:** CVE-2026-109618 / CVE-2026-109619 (GHSA-w8hw-w9fx-j79w / GHSA-6wmf-4rv5-p3rp、php-src コミット 01a40e89「Avoid state corruption via bailout」)。7.2.28 / 7.3.15 / 7.4.3 より古い PHP では同じラッパが CVE-2020-7062 も防ぎます。
 
-2026-10-21 に予定されている PHP のセキュリティリリース (CVE-2026-109618 / CVE-2026-109619 として公に報じられているもの) と、それに対して公開された PoC に関する対応です。PoC は、アップロード進捗コールバックが進捗配列に対してキャッシュしている zval ポインタを標的にしています。本拡張は multipart の各イベントの直前にそれらのポインタを張り直し、古いコピーを指したままにならないようにします。`session.upload_progress` の機能はそのまま利用できます。また 7.2.28 / 7.3.15 / 7.4.3 より古い PHP では、同じ処理経路にある CVE-2020-7062 によるクラッシュも防ぎます。さらに、`session.use_only_cookies=1` のときに進捗フックがリクエスト本文からセッション ID を取り込むことと、encode できないセッションを保存して中身を消してしまうことも防ぎます。本緩和の作成時点では upstream の修正は未公開のため、公開後に改めて評価します。
+upstream の修正は 2 本立てです。(1) エンジン全体で、OOM 時の bailout を unwinding exit に置き換え、`memory_limit` に達したリクエストが半初期化の構造を残せないようにする。(2) RINIT 前に走る `session.upload_progress` ハンドラを安全化する: multipart 本文の開始時に (un)serializer とセッションのリクエスト状態をリセットし、セッションをクラス解決なし (`__PHP_Incomplete_Class`、ペイロード保持) で復号し、RINIT 後に届いたイベントを無視し、本文終了時に RINIT 前の `$_SESSION` を削除する。
+
+本拡張が影響バージョンでデフォルト提供するのは、本文開始時の状態リセット、`$_SESSION` の削除、RINIT 後のガード、およびそれ以前からの堅牢化 (ポインタの張り直し、`session.use_only_cookies=1` のとき本文からセッション ID を取らない、シリアライザが保存できないキーを追跡しない) です。詳細は [Security backports](#security-backports) を参照してください。
 
 | PHP | `colopl_bc.security.harden_session_upload_progress` |
 |---|---|
 | 5.4 - 8.1 | 全リリース: デフォルト有効 (`1`) |
-| 8.2 | 8.2.34 以下: デフォルト有効 (`1`) |
-| 8.3 | 8.3.36 以下: デフォルト有効 (`1`) |
-| 8.4 | 8.4.28 以下: デフォルト有効 (`1`) |
-| 8.5 | 8.5.13 以下: デフォルト有効 (`1`) |
-| 上記以外のリリース | 組み込まれません (`0`) |
+| 8.2 | 8.2.35 未満: デフォルト有効 (`1`) |
+| 8.3 | 8.3.36 未満: デフォルト有効 (`1`) |
+| 8.4 | 8.4.27 未満: デフォルト有効 (`1`) |
+| 8.5 | 8.5.12 未満: デフォルト有効 (`1`) |
+| 修正済みリリース | 組み込まれません (`0`): PHP 側で修正済みのため不要 |
+
+### 本拡張にできないこと
+
+ホストが保護されていると判断する前に必ず読んでください。未修正の PHP に本拡張を読み込んでも、以下は残ります。
+
+1. **セッション復号時に RINIT 前でコードが走る。** upstream はクラス解決なしで復号しますが、拡張にはできません。セッションに保存されたオブジェクトは RINIT 前に復元され、(内部クラスの) `__wakeup` / `__unserialize` が未初期化のリクエスト状態の上で走ります。`unserialize_callback_func` が設定されていればそれも呼ばれます。攻撃者が復号対象のセッションにオブジェクトを置ける場合 (serialize handler の不一致、攻撃者制御のシリアライズ値をセッションに書くアプリ、既知のセッション ID) に到達します。
+2. **リクエスト自身の中での OOM。** エンジン全体の bailout 置き換えは拡張では提供できません。状態リセットが守るのは同じプロセス (mod_php、LiteSpeed) の *次の* multipart リクエストだけで、upstream が OOM 安全にしたその他すべて (ハッシュテーブル、文字列、JSON、mbstring、ストリーム等) は未修正のままです。
+3. **URL 書き換え (`session.use_trans_sid`) の状態**は本文開始時にリセットされません (upstream は新設の内部関数でリセットしています)。
+4. **multipart のヘッダ・パート数によるメモリ枯渇**は制限しません (upstream はヘッダの重複排除と `post_max_size` の早期チェックを追加)。Web サーバ側 (`LimitRequestBody`、`client_max_body_size`) と `post_max_size` / `max_multipart_body_parts` で制限してください。
+5. **ラッパは、実行中の PHP がビルド時のヘッダと一致する場合にだけ組み込まれます** (バージョン範囲と `php_ps_globals` のサイズ)。ディストリビューションの独自パッチ、別リリースへのビルドの流用、ZTS や Windows (未検証) では、エラーなしに `inactive` になり得ます。`php -i | grep "pointer hardening"` が `active` でなければ、セッション関連の緩和はどれも効いていません。
+6. **アプリケーションが信頼できない入力を `unserialize()` すること**は、本拡張の有無にかかわらずオブジェクト注入です。`colopl_bc.security.isolate_unserialize` はそこからメモリ安全性のプリミティブを 1 つ取り除くだけです。
+
+未修正ビルドで 1 - 4 を閉じる唯一の設定は `colopl_bc.security.disable_session_upload_progress=1` (または `session.upload_progress.enabled=0`) で、代わりにアップロード進捗機能を失います。これでもセッションハンドラ以外の経路の 2 と、6 は閉じません。
 
 対応手順:
 
-1. colopl_bc を 13.2.1 以降に更新し、拡張を読み込みます (php-fpm、Apache、CLI など、利用しているすべての SAPI で)。
-2. 緩和が有効になっていることを確認します: `php -i | grep "pointer hardening"` が `active (php_rfc1867_callback wrapped)` と表示されること。`inactive` の場合は括弧内に理由が表示されます。
-3. 修正済みの PHP リリースが提供されている場合は、PHP 自体の更新も行ってください。アップロード進捗機能を使っていない場合は、`session.upload_progress.enabled=0` または `colopl_bc.security.disable_session_upload_progress=1` で機能自体を無効化できます。
+1. **PHP を修正済みリリースに更新してください。** これが修正です。以下はそれまでの間のためのものです。
+2. それまでは、colopl_bc 13.3.0 以降をすべての SAPI (php-fpm、Apache、CLI) で読み込み、アプリケーションがアップロード進捗を必要としない限り `colopl_bc.security.disable_session_upload_progress=1` を設定してください。
+3. すべてのホストで緩和が有効になっていることを確認してください: `php -i | grep "pointer hardening"` が `active (php_rfc1867_callback wrapped)` と表示されること。`inactive` の場合は括弧内に理由が表示され、そのホストは保護されていません。
+4. この応急処置の撤去を PHP の更新とあわせて計画してください。恒久的な対策として残さないでください。
 
-互換性: アップロード進捗のエントリはこれまでどおり作成・更新されます。PHP 7.2 以降で `session.upload_progress.cleanup=0` の場合、最終的な `bytes_processed` は古い値ではなく実際に読み込んだ総量になります。また、`session.use_only_cookies=1` でセッション ID がリクエスト本文にしかない場合と、進捗キーに `php` シリアライザが保存できない文字 (`|`) が含まれる場合は、進捗を追跡しません。どちらも現状では正しく動作していないケースです。詳細は [Security backports](#security-backports) を参照してください。
+互換性: アップロード進捗のエントリはこれまでどおり作成・更新されます。PHP 7.2 以降で `session.upload_progress.cleanup=0` の場合、最終的な `bytes_processed` は古い値ではなく実際に読み込んだ総量になります。また、`session.use_only_cookies=1` でセッション ID がリクエスト本文にしかない場合と、進捗キーに `php` シリアライザが保存できない文字 (`|`) が含まれる場合は、進捗を追跡しません。どちらも現状では正しく動作していないケースです。アップロード後、`session_start()` の前に `$_SESSION` が存在しなくなります (修正済みリリースと同じ挙動)。詳細は [Security backports](#security-backports) を参照してください。
 
 ## Supported Versions
 
@@ -127,6 +161,9 @@ $ docker run --rm -e VERSION="x.y.z" -v "$(pwd)/artifacts:/tmp/artifacts" "colop
 This target produces `php8.4-colopl-bc_x.y.z_<arch>_ubuntu22.04_sury.deb`.
 
 ## Security backports
+
+> [!CAUTION]
+> These are emergency stopgaps, not fixes. Read [What this extension cannot do](#what-this-extension-cannot-do) first; the fix for the 2026-10-21 CVEs is the PHP security release.
 
 `ext/colopl_bc_security.c` carries mitigations for PHP security fixes that are not shipped for the PHP versions this extension targets (PHP 7.4, PHP 8.1 and older builds of supported branches). It is written against the lowest common denominator of the extension API and builds on every PHP release since 5.4, so it can also be loaded on PHP 5.x / 7.0 - 7.3 / 8.0 installations that cannot be upgraded immediately.
 

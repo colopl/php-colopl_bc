@@ -84,6 +84,15 @@ This is an opt-in, feature-disabling mitigation: unlike `session.upload_progress
 
 Applies to PHP >= 5.4 (where `session.upload_progress` exists). Once an upstream fix is published, the mitigation will become a no-op on fixed PHP builds.
 
+### `colopl_bc.security.harden_session_upload_progress` (default: `1` on affected PHP versions)
+
+Keeps `session.upload_progress` functional while removing the stale-pointer class in `ext/session`'s upload progress callback. The callback caches raw zval pointers into the progress array it exports to `$_SESSION` (`bytes_processed`, `files`, the current file entry and its `bytes_processed`) and writes through them on every multipart event, although that array is shared with the session and replaced or separated by each update cycle. This mitigation wraps the hook installed by `ext/session` and, before each event that writes through those pointers, rebinds them to the array tree the progress record owns; at the end of the upload with `session.upload_progress.cleanup=0` it separates the array first so that the final write lands in the array that is saved. If the tree does not have the expected layout, progress tracking is dropped for that upload instead of following a cached pointer.
+
+- `0`: not applied. `session.upload_progress` behaves as in the running PHP version.
+- `1`: applied. Upload progress entries are created and updated as before. The only observable difference is that with `session.upload_progress.cleanup=0` on PHP 7.2+ the final `bytes_processed` is the total that was read (as on PHP 5.4 - 7.1) instead of a stale value.
+
+Affected PHP versions (compiled in and enabled by default): PHP <= 8.1 (every release), PHP 8.2 <= 8.2.34, PHP 8.3 <= 8.3.36, PHP 8.4 <= 8.4.28, PHP 8.5 <= 8.5.13. On other versions the mitigation is not compiled in and the directive defaults to `0`. Because the callback's data layout is taken from the PHP headers used at build time, the wrapper is also only installed when the *running* PHP version is affected and the session globals match those headers; otherwise `phpinfo()` reports it as `inactive` with the reason. It is not installed when `colopl_bc.security.disable_session_upload_progress=1` has already detached the hook.
+
 ## API references
 
 ### INI directives

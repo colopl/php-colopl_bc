@@ -49,7 +49,30 @@
 # define COLOPL_BC_SECURITY_SESSION_UPLOAD_PROGRESS_SUPPORTED 0
 #endif
 
+/*
+ * PHP versions whose ext/session upload progress callback dereferences the
+ * zval pointers it caches into its progress array (see colopl_bc_security.c).
+ * PHP <= 8.1 is affected on every release; PHP 8.2 - 8.5 up to and including
+ * the listed release of each branch. Usable both in #if and at runtime.
+ */
+#define COLOPL_BC_SECURITY_SESSION_UPLOAD_PROGRESS_POINTERS_AFFECTED(id) ( \
+	(id) < 80200 || \
+	((id) >= 80200 && (id) < 80300 && (id) <= 80234) || \
+	((id) >= 80300 && (id) < 80400 && (id) <= 80336) || \
+	((id) >= 80400 && (id) < 80500 && (id) <= 80428) || \
+	((id) >= 80500 && (id) < 80600 && (id) <= 80513) \
+)
+
+/* Needs the ext/session headers (HAVE_PHP_SESSION: PHP was built with session, shared or not). */
+#if COLOPL_BC_SECURITY_HAVE_RFC1867_CALLBACK && defined(HAVE_PHP_SESSION) && \
+	COLOPL_BC_SECURITY_SESSION_UPLOAD_PROGRESS_POINTERS_AFFECTED(PHP_VERSION_ID)
+# define COLOPL_BC_SECURITY_SESSION_UPLOAD_PROGRESS_HARDENING_SUPPORTED 1
+#else
+# define COLOPL_BC_SECURITY_SESSION_UPLOAD_PROGRESS_HARDENING_SUPPORTED 0
+#endif
+
 #define COLOPL_BC_SECURITY_INI_DISABLE_SESSION_UPLOAD_PROGRESS "colopl_bc.security.disable_session_upload_progress"
+#define COLOPL_BC_SECURITY_INI_HARDEN_SESSION_UPLOAD_PROGRESS "colopl_bc.security.harden_session_upload_progress"
 
 int colopl_bc_security_minit(INIT_FUNC_ARGS);
 int colopl_bc_security_mshutdown(SHUTDOWN_FUNC_ARGS);
@@ -57,5 +80,8 @@ void colopl_bc_security_minfo(ZEND_MODULE_INFO_FUNC_ARGS);
 
 /* Whether the session.upload_progress hook is currently detached by this extension. */
 int colopl_bc_security_session_upload_progress_is_disabled(void);
+
+/* Whether the session.upload_progress hook is currently wrapped by the pointer hardening. */
+int colopl_bc_security_session_upload_progress_is_hardened(void);
 
 #endif	/* PHP_COLOPL_BC_SECURITY_H */

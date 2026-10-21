@@ -1,3 +1,10 @@
+# 13.2.1
+- Add `colopl_bc.security.harden_session_upload_progress` INI directive, which wraps the `session.upload_progress` hook and rebinds the zval pointers that ext/session caches into its progress array before every event that writes through them (PHP 5.4+, separate PHP 5 / PHP 7+ code paths)
+  - Enabled by default (`1`) on affected PHP versions: PHP <= 8.1 (every release), 8.2 <= 8.2.34, 8.3 <= 8.3.36, 8.4 <= 8.4.28, 8.5 <= 8.5.13; not compiled in (`0`) on other versions
+  - Only installed when the running PHP version is affected as well and the session globals layout matches the headers the extension was built against
+  - With `session.upload_progress.cleanup=0` on PHP 7.2+, the final `bytes_processed` is now the total that was read instead of a stale value
+- Report the hardening state in `phpinfo()`
+
 # 13.2.0
 - Add security backports (`ext/colopl_bc_security.c`), buildable on every PHP release since 5.4
 - Build in "security only" mode on PHP versions that are not compatibility-layer targets (PHP 5.4 - 7.3, 8.0)

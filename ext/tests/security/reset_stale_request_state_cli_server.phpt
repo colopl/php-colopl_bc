@@ -35,8 +35,10 @@ $port = (int) substr(strrchr(stream_socket_get_name($socket, false), ':'), 1);
 fclose($socket);
 
 $cmd = escapeshellarg(PHP_BINARY) . ' -n -d display_errors=1 -d log_errors=0';
-$loaded = trim((string) shell_exec(escapeshellarg(PHP_BINARY) . ' -n -r "echo (int) extension_loaded(\'colopl_bc\');"'));
-if ($loaded !== '1') {
+// -m instead of -r: no PHP code to quote for the shell. Load the shared
+// extension only when it is not built in.
+$modules = array_map('trim', explode("\n", (string) shell_exec(escapeshellarg(PHP_BINARY) . ' -n -m')));
+if (!in_array('colopl_bc', $modules, true)) {
     $cmd .= ' -d extension_dir=' . escapeshellarg(ini_get('extension_dir')) . ' -d extension=colopl_bc';
 }
 $cmd .= ' -d colopl_bc.security.reset_stale_request_state=1 -S 127.0.0.1:' . $port . ' -t ' . escapeshellarg($docroot);

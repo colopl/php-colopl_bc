@@ -3,7 +3,7 @@ security: phpinfo() reports the memory error and timeout process aborts as activ
 --EXTENSIONS--
 colopl_bc
 --SKIPIF--
-<?php if (!extension_loaded('colopl_bc')) die('skip colopl_bc extension is not loaded'); ?>
+<?php include dirname(__FILE__) . '/skipif_backport.inc'; ?>
 --FILE--
 <?php
 ob_start();

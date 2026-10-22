@@ -91,6 +91,7 @@
 #define COLOPL_BC_SECURITY_INI_ABORT_ON_MEMORY_ERROR "colopl_bc.security.abort_on_memory_error"
 #define COLOPL_BC_SECURITY_INI_ABORT_ON_TIMEOUT "colopl_bc.security.abort_on_timeout"
 #define COLOPL_BC_SECURITY_INI_RESET_STALE_REQUEST_STATE "colopl_bc.security.reset_stale_request_state"
+#define COLOPL_BC_SECURITY_INI_DETECT_BACKPORTED_FIX "colopl_bc.security.detect_backported_fix"
 
 /*
  * TODO(secfix): once the upstream fix for the unserialize() nested-state issue
@@ -126,5 +127,8 @@ int colopl_bc_security_abort_on_timeout_is_active(void);
 
 /* Whether request-owned state that outlives its memory is cleared at the end of every request. */
 int colopl_bc_security_stale_request_state_reset_is_active(void);
+
+/* Whether the running PHP was found to carry an unversioned backport of the 2026-10-21 fix (heuristic). */
+int colopl_bc_security_backported_fix_is_detected(void);
 
 #endif	/* PHP_COLOPL_BC_SECURITY_H */

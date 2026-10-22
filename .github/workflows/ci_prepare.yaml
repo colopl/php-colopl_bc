@@ -14,7 +14,7 @@ on:
         value: ${{ jobs.prepare.outputs.archive_name }}
 jobs:
   prepare:
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
     outputs:
       artifact_name: ${{ steps.metadata.outputs.artifact_name }}
       artifact_run_id: ${{ steps.metadata.outputs.artifact_run_id }}

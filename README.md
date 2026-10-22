@@ -14,13 +14,13 @@ Provides various compatibility functions required for PHP (temporary) migration.
 >
 > **The fix is PHP itself:**
 > - PHP 8.2 - 8.5: **upgrade to PHP 8.2.35, 8.3.36, 8.4.27, 8.5.12 or later.**
-> - PHP 7.4 / 8.0 / 8.1 (end of life): the PHP security team published **minimal source backports** as git branches, not releases: [`PHP-7.4-CVE-2026-109618-109619`](https://github.com/php/php-src/tree/PHP-7.4-CVE-2026-109618-109619), [`PHP-8.0-CVE-2026-109618-109619`](https://github.com/php/php-src/tree/PHP-8.0-CVE-2026-109618-109619), [`PHP-8.1-CVE-2026-109618-109619`](https://github.com/php/php-src/tree/PHP-8.1-CVE-2026-109618-109619). Apply that commit if you build from source, or install the vendor package that carries it (see [Official minimal backports](#official-minimal-backports-for-php-74--80--81)), then plan the upgrade to a supported version.
-> - PHP 5.4 - 7.3: nothing exists. Migrate.
+> - PHP 7.4 / 8.0 / 8.1 (end of life): the PHP security team published **minimal source backports** as git branches, not releases: [`PHP-7.4-CVE-2026-109618-109619`](https://github.com/php/php-src/tree/PHP-7.4-CVE-2026-109618-109619), [`PHP-8.0-CVE-2026-109618-109619`](https://github.com/php/php-src/tree/PHP-8.0-CVE-2026-109618-109619), [`PHP-8.1-CVE-2026-109618-109619`](https://github.com/php/php-src/tree/PHP-8.1-CVE-2026-109618-109619). Apply that commit if you build from source, or install a vendor package that carries it (deb.sury.org, Remi, Ubuntu 22.04, ...; see [Unversioned backports](#unversioned-backports-for-php-56---81)), then plan the upgrade to a supported version.
+> - PHP 5.4 - 7.3: there is no official backport, but several vendors ship ports of the same commit as package updates: deb.sury.org (`ppa:ondrej/php`, packages.sury.org) for 5.6 - 7.3, Ubuntu ESM for 5.5 / 7.0 / 7.2, TuxCare ELS for 5.4 (RHEL / CentOS / Oracle Linux / CloudLinux 7, Amazon Linux 2), Freexian ELTS for 7.0 / 7.3, AlmaLinux for 7.2 / 7.3. Remi has nothing for 5.4 - 7.3 (as of 2026-10-22). See [Unversioned backports](#unversioned-backports-for-php-56---81). Without such a package: migrate.
 >
 > **This extension** carries emergency stopgaps written during the disclosure window for the hours or days until one of the above is in place. They have not been reviewed by the PHP security team, they cover only the paths listed under [Security backports](#security-backports), they cannot reproduce the fix (see [What this extension cannot do](#what-this-extension-cannot-do)), and the session-related parts are silently inactive on builds whose session globals do not match the headers they were built against. If you are reading this to decide whether a host is covered: it is not. Treat it as vulnerable until PHP itself is fixed, and remove the stopgaps afterwards.
 
 > [!IMPORTANT]
-> Since **13.2.1** loading this extension applies the stopgaps **by default** on affected PHP versions; no configuration change is needed, and none makes a host safe. Since **13.3.0** the session-related parts follow the published upstream fix where an extension can. Since **13.4.0** a memory error or an execution timeout ends the worker instead of bailing out, which is the only answer an extension has to the engine-wide part. Since **13.5.0** the request state that the next request of a worker could read before its own initialization is cleared at the end of every request, as the fix does.
+> Since **13.2.1** loading this extension applies the stopgaps **by default** on affected PHP versions; no configuration change is needed, and none makes a host safe. Since **13.3.0** the session-related parts follow the published upstream fix where an extension can. Since **13.4.0** a memory error or an execution timeout ends the worker instead of bailing out, which is the only answer an extension has to the engine-wide part. Since **13.5.0** the request state that the next request of a worker could read before its own initialization is cleared at the end of every request, as the fix does, and a PHP build that carries an unversioned backport of the fix is recognized (heuristically, see [below](#how-this-extension-recognizes-a-backported-build-heuristic)) so that the stopgaps the backport makes redundant are not applied there.
 >
 > **CVEs:** CVE-2026-109618 (RCE via OOM corruption, GHSA-w8hw-w9fx-j79w) / CVE-2026-109619 (RCE via stale global state, GHSA-6wmf-4rv5-p3rp); php-src commit 01a40e89, "Avoid state corruption via bailout"; fixed in PHP 8.2.35 / 8.3.36 / 8.4.27 / 8.5.12. On PHP older than 7.2.28 / 7.3.15 / 7.4.3 the session wrapper also guards CVE-2020-7062.
 
@@ -30,27 +30,49 @@ This extension provides, by default on affected versions: for (1), ending the wo
 
 | PHP | `colopl_bc.security.harden_session_upload_progress` |
 |---|---|
-| 5.4 - 8.1 | every release: enabled by default (`1`), also on builds with the official minimal backport (see below) |
+| 5.4 - 8.1 | every release: enabled by default (`1`); not applied on a build recognized as carrying a backport of the fix (see below) |
 | 8.2 | < 8.2.35: enabled by default (`1`) |
 | 8.3 | < 8.3.36: enabled by default (`1`) |
 | 8.4 | < 8.4.27: enabled by default (`1`) |
 | 8.5 | < 8.5.12: enabled by default (`1`) |
 | fixed releases | not compiled in (`0`): nothing to do, PHP is fixed |
 
-### Official minimal backports for PHP 7.4 / 8.0 / 8.1
+### Unversioned backports for PHP 5.6 - 8.1
 
-The branches linked above hold one commit each ("Avoid state corruption via bailout — Minimal mitigation for EOL version", by the PHP security team). Vendors have started shipping it; shivammathur/homebrew-php `php@8.1` 8.1.34_4 (used by setup-php on macOS) is one, and the Ubuntu 22.04 `php8.1` update published the same day (8.1.2-1ubuntu2.28) shows the same behaviour in this repository's package build. **`PHP_VERSION` / `PHP_VERSION_ID` do not change** (the 7.4 branch even reports `7.4.31-dev`), so neither this extension nor your tooling can tell a backported build from a vulnerable one by version. What the backport does:
+For the end-of-life branches 7.4 / 8.0 / 8.1 the PHP security team published one commit each on the branches linked above ("Avoid state corruption via bailout — Minimal mitigation for EOL version"), and vendors ship it, or ports of it, as package updates. **None of them changes `PHP_VERSION` / `PHP_VERSION_ID`** (the 7.4 branch even reports `7.4.31-dev`; packages change only their package release), so a version check cannot tell a backported build from a vulnerable one. Known as of 2026-10-22:
 
-| Official minimal backport (7.4 / 8.0 / 8.1) | This extension |
+| Vendor | PHP | Packages (released 2026-10-21 unless noted) | Notes |
+|---|---|---|---|
+| PHP security team | 7.4 / 8.0 / 8.1 | git branches `PHP-x.y-CVE-2026-109618-109619` (source only) | The reference commit. |
+| deb.sury.org (`ppa:ondrej/php`, packages.sury.org) | 5.6 / 7.0 / 7.1 / 7.2 / 7.3 / 7.4 / 8.0 / 8.1 | `php5.6` 5.6.40-104, `php7.0` 7.0.33-92, `php7.1` 7.1.33-80, `php7.2` 7.2.34-66, `php7.3` 7.3.33-35, `php7.4` 1:7.4.33-31, `php8.0` 1:8.0.30-25, `php8.1` 8.1.34-9 (Debian 11 - 13, Ubuntu 22.04 - 26.04) | The same commit (`debian/patches/*-Avoid-state-corruption-via-bailout.patch`, changelog "Backported from 8.2.35"), ported to 5.6 - 7.3 by the packager; it does the same things on those versions. No 5.4 / 5.5 packages. |
+| Remi (rpms.remirepo.net) | 7.4 / 8.0 / 8.1 | `php74-php` and module `php:remi-7.4` 7.4.33-31, `php80-php` / `php:remi-8.0` 8.0.30-21, `php81-php` / `php:remi-8.1` 8.1.34-6 (EL 8 / 9 / 10, Fedora) | The official commit unchanged ([remicollet/php-src-security](https://github.com/remicollet/php-src-security) `PHP-x.y-security-backports`). **Nothing for 5.4 - 7.3**: `php56-php` ... `php73-php` were last updated in July / August 2026, `php54-php` / `php55-php` exist for EL 7 only and were last built in 2022, and Remi does not build for EL 7. Whether 5.6 - 7.3 will follow has not been announced. |
+| Red Hat | 7.4 / 8.0 | RHEL 8 `php:7.4` 7.4.33-8.module+el8.10.0+25117+30337cca (RHSA-2026:87080), RHEL 9 `php` 8.0.30-8.el9_8.1 (RHSA-2026:87151) | RHEL 7 `php` 5.4.16 and RHEL 6: no fix from Red Hat ("under investigation"). |
+| AlmaLinux | 7.2 / 7.3 / 7.4 / 8.0 / 8.1 | AlmaLinux 8 / 9 module streams and base packages (`*.alma.1`) | 7.2 / 7.3 ported by CloudLinux. |
+| Ubuntu | 8.1; ESM: 5.5 / 7.0 / 7.2 / 7.4 | 22.04 `php8.1` 8.1.2-1ubuntu2.28 (USN-8948-1); Ubuntu Pro ESM (USN-8948-2): 14.04 `php5` 5.5.9+dfsg-1ubuntu4.29+esm18, 16.04 `php7.0` 7.0.33-0ubuntu0.16.04.16+esm22, 18.04 `php7.2` 7.2.24-0ubuntu0.18.04.17+esm14, 20.04 `php7.4` 7.4.3-4ubuntu2.29+esm5 | The ESM sources are not public; whether they add the symbol this extension looks for was not checked. |
+| Freexian ELTS (Debian) | 7.0 / 7.3 / 7.4 | 9 `php7.0` 7.0.33-0+deb9u26 (ELA-1855-1), 10 `php7.3` 7.3.31-1~deb10u16 (ELA-1854-1), 11 `php7.4` 7.4.33-1+deb11u14 (ELA-1853-1) | |
+| TuxCare ELS | 5.4 (and later versions) | `php` 5.4.16-48.el7.tuxcare.els21 (RHEL / CentOS / Oracle Linux 7 ELS), 5.4.16-48.el7.tuxcare.els24 (CloudLinux 7 ELS), 5.4.16-46.amzn2.0.7.tuxcare.els11 (Amazon Linux 2 ELS), others on [cve.tuxcare.com](https://cve.tuxcare.com/els/cve/CVE-2026-109618) | Sources are not public; whether they add the symbol was not checked. |
+| CloudLinux alt-php | 5.4 / 5.5 / 5.6 | alt-php54 5.4.45-203, alt-php55 5.5.38-183, alt-php56 5.6.40-147 | `updates-testing` only as of 2026-10-22. |
+| shivammathur/homebrew-php | 8.1 | `php@8.1` 8.1.34_4 | Used by setup-php on macOS. |
+
+Debian (other than ELTS), SUSE (SLE 12 and older are not listed) and Remi have nothing for 5.4 / 5.5. This list is not complete; ask your vendor whether its PHP package carries the fix. What a backport does, and what this extension does on such a build:
+
+| Backport (5.6 - 8.1) | This extension on a build recognized as backported |
 |---|---|
-| A memory error (`memory_limit`, out of memory, integer overflow in an allocation) prints `Fatal error: ...` to **stderr** and ends the process with `_exit(1)`, without going through the error callback: no error log entry, no `display_errors` output, no shutdown functions. | `colopl_bc.security.abort_on_memory_error` does the same for the same errors from the error callback, with the error log entry and the display. On a backported build the callback is never reached, so the directive has no effect. |
-| `session.upload_progress` is turned off unconditionally (the handler returns before doing anything; the INI still reads `1`). | `colopl_bc.security.disable_session_upload_progress=1`. The hardening wrapper still installs on such builds and reports `active`; it is harmless there and does nothing useful. |
-| State the next request could see is reset at request shutdown: `PG(modules_activated)`, the `$_GET` / `$_POST` / ... globals, SAPI request info, user error / exception handlers, the object store. | `colopl_bc.security.reset_stale_request_state` (13.5.0+) clears the same state from the module's post-RSHUTDOWN hook and a wrapped SAPI deactivation. |
-| Multipart parser: duplicate and unused part headers are dropped, new `max_multipart_body_parts` INI (default `max_input_vars + max_file_uploads`), size fixes. | Not possible in an extension (item 4 below). |
+| A memory error (`memory_limit`, out of memory, integer overflow in an allocation) prints `Fatal error: ...` to **stderr** and ends the process with `_exit(1)`, without going through the error callback: no error log entry, no `display_errors` output, no shutdown functions. | `colopl_bc.security.abort_on_memory_error` is not applied: the callback would never be reached. |
+| `session.upload_progress` is turned off unconditionally (the handler returns before doing anything; the INI still reads `1`). | `colopl_bc.security.harden_session_upload_progress` is not applied. `colopl_bc.security.disable_session_upload_progress=1` changes nothing either. |
+| State the next request could see is reset at request shutdown: `PG(modules_activated)`, the `$_GET` / `$_POST` / ... globals, SAPI request info, user error / exception handlers, the object store. | `colopl_bc.security.reset_stale_request_state` is not applied. |
+| Multipart parser: duplicate and unused part headers are dropped, new `max_multipart_body_parts` INI (default `max_input_vars + max_file_uploads`) where the branch did not have it yet, size fixes. | Not possible in an extension (item 4 below). |
 | GPC arrays allocated without hash storage, `HT_HASH_RESET` fix, 8.1 only: opcache persistence fixes. | Not possible in an extension. |
-| `max_execution_time` handling is unchanged. | `colopl_bc.security.abort_on_timeout` stays relevant. |
+| `max_execution_time` handling is unchanged. | `colopl_bc.security.abort_on_timeout` stays applied. |
 
-The backport is not the fix of 8.2.35+: there is no unwinding exit and no class-free session decode, upload progress is simply removed, and a memory error now kills the worker without a trace in the PHP error log. To tell the builds apart, run `php -n -d memory_limit=2M -d colopl_bc.security.abort_on_memory_error=0 -r 'register_shutdown_function(function () { echo "bailout\n"; }); str_repeat("x", 1 << 26);'`: an unpatched build prints `bailout` (the shutdown function ran after the bailout), a backported build prints only the `Fatal error` line on stderr and exits with status 1.
+The backport is not the fix of 8.2.35+: there is no unwinding exit and no class-free session decode, upload progress is simply removed, and a memory error now kills the worker without a trace in the PHP error log. To tell the builds apart by behaviour, run `php -n -d memory_limit=2M -d colopl_bc.security.abort_on_memory_error=0 -r 'register_shutdown_function(function () { echo "bailout\n"; }); str_repeat("x", 1 << 26);'`: an unpatched build prints `bailout` (the shutdown function ran after the bailout), a backported build prints only the `Fatal error` line on stderr and exits with status 1.
+
+#### How this extension recognizes a backported build (heuristic)
+
+Since 13.5.0 the extension checks at startup whether the running PHP exports the function `zend_mm_safe_error_ex()`. Every backport above whose source could be inspected adds it (the official commit, deb.sury.org, Remi, Red Hat / AlmaLinux, Freexian, Ubuntu 22.04, CloudLinux; it is the function that ends the process on a memory error) and no PHP release has it, so its presence is taken as the sign of the backport. When it is found, `phpinfo()` reports `2026-10-21 fix backported into PHP (heuristic) => detected (zend_mm_safe_error_ex exported)`, and `colopl_bc.security.abort_on_memory_error`, `harden_session_upload_progress` and `reset_stale_request_state` report `inactive (backported fix detected in the running PHP)` instead of being applied. Their INI values are not changed. `colopl_bc.security.abort_on_timeout` and the opt-in directives are applied as usual.
+
+> [!WARNING]
+> **The detection is a heuristic and can be wrong.** It looks for one exported symbol; it does not check what the build actually does. A build that has the symbol without the rest of the fix (a partial or modified patch) is taken as fixed, and the stopgaps are then missing on a vulnerable host. A backport that does not add the symbol (a vendor's own port, a later revision of the patch; the Ubuntu ESM and TuxCare packages could not be checked), a PHP that does not export its symbols (some fully static builds), and a distribution package of 8.2 - 8.5 that carries the full upstream fix without the fixed version number (for example Ubuntu 24.04 `php8.3` 8.3.6-0ubuntu0.24.04.13) are taken as unfixed, which means the stopgaps are applied as on an unfixed build. Do not use the `phpinfo()` line to decide whether a host is fixed: check the vendor's advisory and the package version, and the behaviour with the command above. Set `colopl_bc.security.detect_backported_fix=0` to skip the check and apply the stopgaps as on any unfixed build.
 
 ### What this extension cannot do
 
@@ -68,9 +90,9 @@ On an unfixed build, `colopl_bc.security.disable_session_upload_progress=1` (or 
 
 What to do:
 
-1. **Fix PHP.** Upgrade to a fixed release (8.2+), apply the official minimal backport or your vendor's package (7.4 / 8.0 / 8.1), or migrate (5.4 - 7.3). This is the only fix. Everything below is for the hours until that is done.
+1. **Fix PHP.** Upgrade to a fixed release (8.2+), apply the official minimal backport or install a vendor package that carries it or a port of it (7.4 / 8.0 / 8.1, and for 5.4 - 7.3 the vendors listed in [Unversioned backports](#unversioned-backports-for-php-56---81)), or migrate. This is the only fix. Everything below is for the hours until that is done.
 2. Until then, reduce exposure as php.net recommends: `session.upload_progress.enabled=0` applied before request parsing (php.ini, FPM pool, server configuration) and a restart of every worker; `memory_limit=-1` set so that applications cannot override it; a low `post_max_size`; request size, part and header limits at the web server; on 8.5 `fatal_error_backtraces=0`. Load colopl_bc 13.5.0 or later in every SAPI (php-fpm, Apache, CLI) and set `colopl_bc.security.disable_session_upload_progress=1` unless the application needs upload progress.
-3. Check that the stopgaps are active on every host: `php -i | grep "pointer hardening"` must report `active (php_rfc1867_callback wrapped)` (`inactive` shows the reason and means the session stopgaps do not apply), `php -i | grep "process abort"` must report `active` twice, and `php -i | grep "stale request state"` must report `active`.
+3. Check that the stopgaps are active on every host: `php -i | grep "pointer hardening"` must report `active (php_rfc1867_callback wrapped)` (`inactive` shows the reason and means the session stopgaps do not apply), `php -i | grep "process abort"` must report `active` twice, and `php -i | grep "stale request state"` must report `active`. On a build where `php -i | grep "fix backported"` reports `detected`, the hardening, the memory error abort and the stale state reset report `inactive (backported fix detected in the running PHP)` instead, which is expected; that line is a heuristic, so confirm the backport with the vendor's advisory and the behavioural check in [Unversioned backports](#unversioned-backports-for-php-56---81).
 4. Remove the stopgaps together with the PHP fix; do not keep them as the long-term answer.
 
 Compatibility: upload progress entries are created and updated as before. With `session.upload_progress.cleanup=0` on PHP 7.2+, the final `bytes_processed` is the total that was read instead of a stale value. Uploads are not tracked when, with `session.use_only_cookies=1`, the session ID only comes from the request body, or when the progress key contains a character the `php` serializer cannot store (`|`); neither case works correctly today. `$_SESSION` is no longer populated before `session_start()` after an upload (as in the fixed releases). A request that hits `memory_limit` or `max_execution_time` ends the worker instead of running its shutdown functions. See [Security backports](#security-backports) for details.
@@ -84,13 +106,13 @@ Compatibility: upload progress entries are created and updated as before. With `
 >
 > **修正は PHP 本体です:**
 > - PHP 8.2 - 8.5: **PHP 8.2.35 / 8.3.36 / 8.4.27 / 8.5.12 以降に更新してください。**
-> - PHP 7.4 / 8.0 / 8.1 (EOL): PHP セキュリティチームが **最小限のソースバックポート** をリリースではなく git ブランチとして公開しています: [`PHP-7.4-CVE-2026-109618-109619`](https://github.com/php/php-src/tree/PHP-7.4-CVE-2026-109618-109619)、[`PHP-8.0-CVE-2026-109618-109619`](https://github.com/php/php-src/tree/PHP-8.0-CVE-2026-109618-109619)、[`PHP-8.1-CVE-2026-109618-109619`](https://github.com/php/php-src/tree/PHP-8.1-CVE-2026-109618-109619)。ソースからビルドしている場合はこのコミットを適用し、そうでなければこれを含むベンダーのパッケージを導入してください (後述「[公式の最小バックポート](#公式の最小バックポート-php-74--80--81)」)。その上でサポート中のバージョンへの移行を計画してください。
-> - PHP 5.4 - 7.3: 何も存在しません。移行してください。
+> - PHP 7.4 / 8.0 / 8.1 (EOL): PHP セキュリティチームが **最小限のソースバックポート** をリリースではなく git ブランチとして公開しています: [`PHP-7.4-CVE-2026-109618-109619`](https://github.com/php/php-src/tree/PHP-7.4-CVE-2026-109618-109619)、[`PHP-8.0-CVE-2026-109618-109619`](https://github.com/php/php-src/tree/PHP-8.0-CVE-2026-109618-109619)、[`PHP-8.1-CVE-2026-109618-109619`](https://github.com/php/php-src/tree/PHP-8.1-CVE-2026-109618-109619)。ソースからビルドしている場合はこのコミットを適用し、そうでなければこれを含むベンダーのパッケージ (deb.sury.org、Remi、Ubuntu 22.04 など) を導入してください (後述「[バージョン表記の変わらないバックポート](#バージョン表記の変わらないバックポート-php-56---81)」)。その上でサポート中のバージョンへの移行を計画してください。
+> - PHP 5.4 - 7.3: 公式のバックポートはありませんが、複数のベンダーが同じコミットの移植をパッケージ更新として配布しています: deb.sury.org (`ppa:ondrej/php`、packages.sury.org) が 5.6 - 7.3、Ubuntu ESM が 5.5 / 7.0 / 7.2、TuxCare ELS が 5.4 (RHEL / CentOS / Oracle Linux / CloudLinux 7、Amazon Linux 2)、Freexian ELTS が 7.0 / 7.3、AlmaLinux が 7.2 / 7.3。Remi は 5.4 - 7.3 を提供していません (2026-10-22 時点)。後述「[バージョン表記の変わらないバックポート](#バージョン表記の変わらないバックポート-php-56---81)」を参照してください。そうしたパッケージがなければ移行してください。
 >
 > **本拡張** が持つのは、公開から上記のいずれかが入るまでの数時間〜数日をしのぐために公開期間中に書かれた緊急避難です。PHP セキュリティチームのレビューは受けておらず、[Security backports](#security-backports) に列挙した経路しか扱わず、修正を再現することはできず (「[本拡張にできないこと](#本拡張にできないこと)」)、セッション関連の部分はビルド時のヘッダとセッションのグローバル構造が一致しないビルドでは何も言わずに無効になります。ホストが保護されているかどうかを判断するためにこれを読んでいるなら、答えは「保護されていない」です。PHP 本体が修正されるまで脆弱なものとして扱い、修正後は緊急避難を取り除いてください。
 
 > [!IMPORTANT]
-> **13.2.1** 以降、本拡張を読み込むと、影響を受ける PHP バージョンで緊急避難が **デフォルトで** 適用されます。設定変更は不要ですが、どの設定もホストを安全にはしません。**13.3.0** 以降、セッション関連の部分は公開された upstream の修正のうち拡張から再現できる部分に追従しています。**13.4.0** 以降、メモリエラーと実行タイムアウトは bailout の代わりにワーカーを終了させます。これがエンジン全体の問題に対して拡張が持つ唯一の答えです。**13.5.0** 以降、ワーカーの次のリクエストが自身の初期化前に読み得るリクエスト状態を、修正と同様にリクエスト終了時にクリアします。
+> **13.2.1** 以降、本拡張を読み込むと、影響を受ける PHP バージョンで緊急避難が **デフォルトで** 適用されます。設定変更は不要ですが、どの設定もホストを安全にはしません。**13.3.0** 以降、セッション関連の部分は公開された upstream の修正のうち拡張から再現できる部分に追従しています。**13.4.0** 以降、メモリエラーと実行タイムアウトは bailout の代わりにワーカーを終了させます。これがエンジン全体の問題に対して拡張が持つ唯一の答えです。**13.5.0** 以降、ワーカーの次のリクエストが自身の初期化前に読み得るリクエスト状態を、修正と同様にリクエスト終了時にクリアします。また、修正のバージョン表記の変わらないバックポートを含む PHP ビルドを (ヒューリスティックに、[後述](#本拡張によるバックポート済みビルドの判定-ヒューリスティック)) 判定し、そのビルドではバックポートにより不要になる緊急避難を適用しません。
 >
 > **対象 CVE:** CVE-2026-109618 (OOM による破損経由の RCE、GHSA-w8hw-w9fx-j79w) / CVE-2026-109619 (残留したグローバル状態経由の RCE、GHSA-6wmf-4rv5-p3rp)。php-src コミット 01a40e89「Avoid state corruption via bailout」、PHP 8.2.35 / 8.3.36 / 8.4.27 / 8.5.12 で修正。7.2.28 / 7.3.15 / 7.4.3 より古い PHP ではセッションのラッパが CVE-2020-7062 も防ぎます。
 
@@ -100,27 +122,49 @@ upstream の修正は 2 本立てです。(1) エンジン全体で、OOM 時の
 
 | PHP | `colopl_bc.security.harden_session_upload_progress` |
 |---|---|
-| 5.4 - 8.1 | 全リリース: デフォルト有効 (`1`)。公式の最小バックポートを含むビルド (後述) でも同じ |
+| 5.4 - 8.1 | 全リリース: デフォルト有効 (`1`)。修正のバックポートを含むと判定したビルド (後述) では適用しない |
 | 8.2 | 8.2.35 未満: デフォルト有効 (`1`) |
 | 8.3 | 8.3.36 未満: デフォルト有効 (`1`) |
 | 8.4 | 8.4.27 未満: デフォルト有効 (`1`) |
 | 8.5 | 8.5.12 未満: デフォルト有効 (`1`) |
 | 修正済みリリース | 組み込まれません (`0`): PHP 側で修正済みのため不要 |
 
-### 公式の最小バックポート (PHP 7.4 / 8.0 / 8.1)
+### バージョン表記の変わらないバックポート (PHP 5.6 - 8.1)
 
-上記のブランチはそれぞれ 1 コミット (「Avoid state corruption via bailout — Minimal mitigation for EOL version」、PHP セキュリティチーム) です。ベンダーの配布は始まっています。shivammathur/homebrew-php の `php@8.1` 8.1.34_4 (macOS の setup-php が使用) がその一つで、同日に公開された Ubuntu 22.04 の `php8.1` 更新 (8.1.2-1ubuntu2.28) も本リポジトリのパッケージビルドで同じ挙動を示します。**`PHP_VERSION` / `PHP_VERSION_ID` は変わりません** (7.4 ブランチは `7.4.31-dev` を名乗ります) ので、本拡張にも運用ツールにも、バックポート済みビルドと脆弱なビルドをバージョンで見分けることはできません。バックポートの内容:
+EOL の 7.4 / 8.0 / 8.1 に対して、PHP セキュリティチームは上記のブランチにそれぞれ 1 コミット (「Avoid state corruption via bailout — Minimal mitigation for EOL version」) を公開しており、ベンダーはこれ、またはこれを移植したものをパッケージ更新として配布しています。**いずれも `PHP_VERSION` / `PHP_VERSION_ID` を変えません** (7.4 ブランチは `7.4.31-dev` を名乗り、パッケージはパッケージのリリース番号だけが変わります) ので、バックポート済みビルドと脆弱なビルドをバージョンで見分けることはできません。2026-10-22 時点で把握しているもの:
 
-| 公式の最小バックポート (7.4 / 8.0 / 8.1) | 本拡張 |
+| 提供元 | PHP | パッケージ (特記なき限り 2026-10-21 公開) | 備考 |
+|---|---|---|---|
+| PHP セキュリティチーム | 7.4 / 8.0 / 8.1 | git ブランチ `PHP-x.y-CVE-2026-109618-109619` (ソースのみ) | 基準となるコミット。 |
+| deb.sury.org (`ppa:ondrej/php`、packages.sury.org) | 5.6 / 7.0 / 7.1 / 7.2 / 7.3 / 7.4 / 8.0 / 8.1 | `php5.6` 5.6.40-104、`php7.0` 7.0.33-92、`php7.1` 7.1.33-80、`php7.2` 7.2.34-66、`php7.3` 7.3.33-35、`php7.4` 1:7.4.33-31、`php8.0` 1:8.0.30-25、`php8.1` 8.1.34-9 (Debian 11 - 13、Ubuntu 22.04 - 26.04) | 同じコミット (`debian/patches/*-Avoid-state-corruption-via-bailout.patch`、changelog は「Backported from 8.2.35」)。5.6 - 7.3 にはパッケージャが移植しており、これらのバージョンでも同じことを行います。5.4 / 5.5 のパッケージはありません。 |
+| Remi (rpms.remirepo.net) | 7.4 / 8.0 / 8.1 | `php74-php` とモジュール `php:remi-7.4` 7.4.33-31、`php80-php` / `php:remi-8.0` 8.0.30-21、`php81-php` / `php:remi-8.1` 8.1.34-6 (EL 8 / 9 / 10、Fedora) | 公式のコミットを無変更で適用 ([remicollet/php-src-security](https://github.com/remicollet/php-src-security) の `PHP-x.y-security-backports`)。**5.4 - 7.3 は未提供**: `php56-php` 〜 `php73-php` の最終更新は 2026 年 7 月 / 8 月、`php54-php` / `php55-php` は EL 7 向けのみで最終ビルドは 2022 年、Remi は EL 7 向けにはビルドしません。5.6 - 7.3 を提供するかどうかは表明されていません。 |
+| Red Hat | 7.4 / 8.0 | RHEL 8 `php:7.4` 7.4.33-8.module+el8.10.0+25117+30337cca (RHSA-2026:87080)、RHEL 9 `php` 8.0.30-8.el9_8.1 (RHSA-2026:87151) | RHEL 7 の `php` 5.4.16 と RHEL 6 は Red Hat からの修正なし (「under investigation」)。 |
+| AlmaLinux | 7.2 / 7.3 / 7.4 / 8.0 / 8.1 | AlmaLinux 8 / 9 のモジュールストリームと標準パッケージ (`*.alma.1`) | 7.2 / 7.3 は CloudLinux による移植。 |
+| Ubuntu | 8.1、ESM: 5.5 / 7.0 / 7.2 / 7.4 | 22.04 `php8.1` 8.1.2-1ubuntu2.28 (USN-8948-1)、Ubuntu Pro ESM (USN-8948-2): 14.04 `php5` 5.5.9+dfsg-1ubuntu4.29+esm18、16.04 `php7.0` 7.0.33-0ubuntu0.16.04.16+esm22、18.04 `php7.2` 7.2.24-0ubuntu0.18.04.17+esm14、20.04 `php7.4` 7.4.3-4ubuntu2.29+esm5 | ESM のソースは非公開のため、本拡張が判定に使うシンボルを追加しているかは未確認。 |
+| Freexian ELTS (Debian) | 7.0 / 7.3 / 7.4 | 9 `php7.0` 7.0.33-0+deb9u26 (ELA-1855-1)、10 `php7.3` 7.3.31-1~deb10u16 (ELA-1854-1)、11 `php7.4` 7.4.33-1+deb11u14 (ELA-1853-1) | |
+| TuxCare ELS | 5.4 (およびそれ以降) | `php` 5.4.16-48.el7.tuxcare.els21 (RHEL / CentOS / Oracle Linux 7 ELS)、5.4.16-48.el7.tuxcare.els24 (CloudLinux 7 ELS)、5.4.16-46.amzn2.0.7.tuxcare.els11 (Amazon Linux 2 ELS)、その他は [cve.tuxcare.com](https://cve.tuxcare.com/els/cve/CVE-2026-109618) | ソースは非公開のため、シンボルを追加しているかは未確認。 |
+| CloudLinux alt-php | 5.4 / 5.5 / 5.6 | alt-php54 5.4.45-203、alt-php55 5.5.38-183、alt-php56 5.6.40-147 | 2026-10-22 時点では `updates-testing` のみ。 |
+| shivammathur/homebrew-php | 8.1 | `php@8.1` 8.1.34_4 | macOS の setup-php が使用。 |
+
+Debian (ELTS 以外)、SUSE (SLE 12 以前は対象に挙がっていません)、Remi は 5.4 / 5.5 を提供していません。この一覧は網羅的ではありません。利用している PHP パッケージが修正を含むかどうかはベンダーに確認してください。バックポートの内容と、そのビルドでの本拡張の動作:
+
+| バックポート (5.6 - 8.1) | バックポート済みと判定したビルドでの本拡張 |
 |---|---|
-| メモリエラー (`memory_limit`、OOM、確保サイズの整数オーバーフロー) は `Fatal error: ...` を **stderr** に出力して `_exit(1)` でプロセスを終了する。エラーコールバックを通らないため、エラーログにも `display_errors` にも出力されず、shutdown 関数も走らない。 | `colopl_bc.security.abort_on_memory_error` は同じエラーに対してエラーコールバックから同じことをし、エラーログへの記録と表示は行う。バックポート済みビルドではコールバックに到達しないため、この設定は効果を持たない。 |
-| `session.upload_progress` を無条件に無効化する (ハンドラが何もせずに戻る。INI の値は `1` のまま)。 | `colopl_bc.security.disable_session_upload_progress=1` 相当。堅牢化ラッパはこのビルドにも組み込まれ `active` と表示されるが、無害であり役にも立たない。 |
-| 次のリクエストから見える状態をリクエスト終了時にリセットする: `PG(modules_activated)`、`$_GET` / `$_POST` などのグローバル、SAPI のリクエスト情報、ユーザーのエラー/例外ハンドラ、オブジェクトストア。 | `colopl_bc.security.reset_stale_request_state` (13.5.0 以降) がモジュールの post-RSHUTDOWN フックと SAPI deactivate の差し替えで同じ状態をクリアする。 |
-| multipart パーサ: 重複ヘッダ・未使用ヘッダの破棄、新設の `max_multipart_body_parts` INI (デフォルト `max_input_vars + max_file_uploads`)、サイズ計算の修正。 | 拡張には不可能 (後述 4)。 |
+| メモリエラー (`memory_limit`、OOM、確保サイズの整数オーバーフロー) は `Fatal error: ...` を **stderr** に出力して `_exit(1)` でプロセスを終了する。エラーコールバックを通らないため、エラーログにも `display_errors` にも出力されず、shutdown 関数も走らない。 | `colopl_bc.security.abort_on_memory_error` を適用しない (コールバックに到達しないため)。 |
+| `session.upload_progress` を無条件に無効化する (ハンドラが何もせずに戻る。INI の値は `1` のまま)。 | `colopl_bc.security.harden_session_upload_progress` を適用しない。`colopl_bc.security.disable_session_upload_progress=1` も何も変えない。 |
+| 次のリクエストから見える状態をリクエスト終了時にリセットする: `PG(modules_activated)`、`$_GET` / `$_POST` などのグローバル、SAPI のリクエスト情報、ユーザーのエラー/例外ハンドラ、オブジェクトストア。 | `colopl_bc.security.reset_stale_request_state` を適用しない。 |
+| multipart パーサ: 重複ヘッダ・未使用ヘッダの破棄、`max_multipart_body_parts` INI (デフォルト `max_input_vars + max_file_uploads`) の新設 (ブランチに未導入の場合)、サイズ計算の修正。 | 拡張には不可能 (後述 4)。 |
 | GPC 配列をハッシュ領域なしで確保、`HT_HASH_RESET` の修正、8.1 のみ: opcache の永続化の修正。 | 拡張には不可能。 |
-| `max_execution_time` の扱いは変更なし。 | `colopl_bc.security.abort_on_timeout` は引き続き意味を持つ。 |
+| `max_execution_time` の扱いは変更なし。 | `colopl_bc.security.abort_on_timeout` は引き続き適用する。 |
 
-このバックポートは 8.2.35 以降の修正と同じものではありません。unwinding exit もクラス解決なしのセッション復号もなく、アップロード進捗は単に削除され、メモリエラーは PHP のエラーログに痕跡を残さずワーカーを終了させます。ビルドの見分け方: `php -n -d memory_limit=2M -d colopl_bc.security.abort_on_memory_error=0 -r 'register_shutdown_function(function () { echo "bailout\n"; }); str_repeat("x", 1 << 26);'` を実行して、未適用のビルドは `bailout` を出力し (bailout 後に shutdown 関数が走る)、バックポート済みのビルドは stderr に `Fatal error` 行だけを出力して終了ステータス 1 で終了します。
+このバックポートは 8.2.35 以降の修正と同じものではありません。unwinding exit もクラス解決なしのセッション復号もなく、アップロード進捗は単に削除され、メモリエラーは PHP のエラーログに痕跡を残さずワーカーを終了させます。挙動でのビルドの見分け方: `php -n -d memory_limit=2M -d colopl_bc.security.abort_on_memory_error=0 -r 'register_shutdown_function(function () { echo "bailout\n"; }); str_repeat("x", 1 << 26);'` を実行して、未適用のビルドは `bailout` を出力し (bailout 後に shutdown 関数が走る)、バックポート済みのビルドは stderr に `Fatal error` 行だけを出力して終了ステータス 1 で終了します。
+
+#### 本拡張によるバックポート済みビルドの判定 (ヒューリスティック)
+
+13.5.0 以降、本拡張は起動時に、実行中の PHP が関数 `zend_mm_safe_error_ex()` をエクスポートしているかを調べます。上記のバックポートのうちソースを確認できたもの (公式のコミット、deb.sury.org、Remi、Red Hat / AlmaLinux、Freexian、Ubuntu 22.04、CloudLinux) はすべてこの関数 (メモリエラーでプロセスを終了させる関数) を追加し、どの PHP リリースにも存在しないため、これがあればバックポート済みとみなします。見つかった場合、`phpinfo()` は `2026-10-21 fix backported into PHP (heuristic) => detected (zend_mm_safe_error_ex exported)` と表示し、`colopl_bc.security.abort_on_memory_error`、`harden_session_upload_progress`、`reset_stale_request_state` は適用されずに `inactive (backported fix detected in the running PHP)` と表示されます。INI の値は変わりません。`colopl_bc.security.abort_on_timeout` とオプトインの設定はこれまでどおり適用されます。
+
+> [!WARNING]
+> **この判定はヒューリスティックであり、常に正しいとは限りません。** 見ているのはエクスポートされたシンボル 1 つだけで、ビルドが実際に何をするかは確認していません。修正の他の部分を含まずにシンボルだけを持つビルド (一部だけ、または改変されたパッチ) は修正済みとみなされ、脆弱なホストで緊急避難が外れます。シンボルを追加しないバックポート (ベンダー独自の移植、パッチの将来の改訂。Ubuntu ESM と TuxCare のパッケージは確認できていません)、シンボルをエクスポートしない PHP (一部の完全静的ビルド)、修正版のバージョン番号にせずに upstream の修正全体を取り込んだ 8.2 - 8.5 のディストリビューションパッケージ (例: Ubuntu 24.04 の `php8.3` 8.3.6-0ubuntu0.24.04.13) は未修正とみなされ、未修正ビルドと同じく緊急避難が適用されます。ホストが修正済みかどうかを `phpinfo()` のこの行で判断しないでください。ベンダーのアドバイザリとパッケージのバージョン、上記のコマンドによる挙動で確認してください。`colopl_bc.security.detect_backported_fix=0` を設定すると判定を行わず、未修正ビルドと同じく緊急避難を適用します。
 
 ### 本拡張にできないこと
 
@@ -138,9 +182,9 @@ upstream の修正は 2 本立てです。(1) エンジン全体で、OOM 時の
 
 対応手順:
 
-1. **PHP を修正してください。** 修正済みリリースへの更新 (8.2 以降)、公式の最小バックポートまたはそれを含むベンダーパッケージの適用 (7.4 / 8.0 / 8.1)、移行 (5.4 - 7.3)。これが唯一の修正です。以下はそれまでの数時間のためのものです。
+1. **PHP を修正してください。** 修正済みリリースへの更新 (8.2 以降)、公式の最小バックポートまたはそれ (あるいはその移植) を含むベンダーパッケージの適用 (7.4 / 8.0 / 8.1、5.4 - 7.3 は「[バージョン表記の変わらないバックポート](#バージョン表記の変わらないバックポート-php-56---81)」のベンダー)、または移行。これが唯一の修正です。以下はそれまでの数時間のためのものです。
 2. それまでは、php.net の推奨どおり露出を減らしてください: リクエスト解析より前に適用される場所 (php.ini、FPM プール、サーバ設定) での `session.upload_progress.enabled=0` と全ワーカーの再起動、アプリケーションが上書きできない形での `memory_limit=-1`、小さい `post_max_size`、Web サーバでのリクエストサイズ・パート数・ヘッダ数の制限、8.5 では `fatal_error_backtraces=0`。あわせて colopl_bc 13.5.0 以降をすべての SAPI (php-fpm、Apache、CLI) で読み込み、アプリケーションがアップロード進捗を必要としない限り `colopl_bc.security.disable_session_upload_progress=1` を設定してください。
-3. すべてのホストで緊急避難が有効になっていることを確認してください: `php -i | grep "pointer hardening"` が `active (php_rfc1867_callback wrapped)` と表示されること (`inactive` の場合は括弧内に理由が表示され、セッション関連の緊急避難は効いていません)、`php -i | grep "process abort"` が `active` を 2 行表示すること、`php -i | grep "stale request state"` が `active` を表示すること。
+3. すべてのホストで緊急避難が有効になっていることを確認してください: `php -i | grep "pointer hardening"` が `active (php_rfc1867_callback wrapped)` と表示されること (`inactive` の場合は括弧内に理由が表示され、セッション関連の緊急避難は効いていません)、`php -i | grep "process abort"` が `active` を 2 行表示すること、`php -i | grep "stale request state"` が `active` を表示すること。`php -i | grep "fix backported"` が `detected` を表示するビルドでは、堅牢化・メモリエラーによるプロセス終了・残留状態のリセットは `inactive (backported fix detected in the running PHP)` と表示されますが、これは想定どおりです。この行はヒューリスティックなので、バックポートの有無はベンダーのアドバイザリと「[バージョン表記の変わらないバックポート](#バージョン表記の変わらないバックポート-php-56---81)」の挙動確認で確かめてください。
 4. 緊急避難は PHP の修正とあわせて取り除いてください。恒久的な対策として残さないでください。
 
 互換性: アップロード進捗のエントリはこれまでどおり作成・更新されます。PHP 7.2 以降で `session.upload_progress.cleanup=0` の場合、最終的な `bytes_processed` は古い値ではなく実際に読み込んだ総量になります。また、`session.use_only_cookies=1` でセッション ID がリクエスト本文にしかない場合と、進捗キーに `php` シリアライザが保存できない文字 (`|`) が含まれる場合は、進捗を追跡しません。どちらも現状では正しく動作していないケースです。アップロード後、`session_start()` の前に `$_SESSION` が存在しなくなります (修正済みリリースと同じ挙動)。`memory_limit` や `max_execution_time` に達したリクエストは shutdown 関数を実行せずにワーカーを終了させます。詳細は [Security backports](#security-backports) を参照してください。
@@ -226,7 +270,7 @@ Detaches the `session.upload_progress` feature from the multipart/form-data pars
 
 This is an opt-in, feature-disabling mitigation: unlike `session.upload_progress.enabled=0` it is enforced in the engine and cannot be re-enabled per directory or at runtime. Note that the hook is shared with any other extension that chains into `php_rfc1867_callback` (for example PECL `uploadprogress`); those are detached as well.
 
-Applies to PHP >= 5.4 (where `session.upload_progress` exists), on fixed releases too: it is a feature switch, not a version-gated mitigation. On a 7.4 / 8.0 / 8.1 build with the [official minimal backport](#official-minimal-backports-for-php-74--80--81) the feature is already off and this changes nothing.
+Applies to PHP >= 5.4 (where `session.upload_progress` exists), on fixed releases too: it is a feature switch, not a version-gated mitigation. On a build with a [backport of the fix](#unversioned-backports-for-php-56---81) the feature is already off and this changes nothing.
 
 ### `colopl_bc.security.harden_session_upload_progress` (default: `1` on affected PHP versions)
 
@@ -250,7 +294,7 @@ The wrapper also closes two logic gaps of the hook that public proof-of-concept 
 - With `session.use_only_cookies=1`, a form field named after the session (`PHPSESSID`) in the multipart body is no longer taken as the session ID of the progress record. `session_start()` never takes the session ID from the request body in that configuration, so only requests that rely on the inconsistency are affected; the field still reaches `$_POST`, and `session.use_only_cookies=0` keeps the previous behaviour.
 - With the `php` serializer (`session.serialize_handler=php`, the default), a progress key containing `|` (and `!` before PHP 7.2) is not tracked. Such a key makes `php_session_encode()` fail on every progress update, and the session is then saved as an empty string, wiping the data stored under that session ID.
 
-Affected PHP versions (compiled in and enabled by default): PHP <= 8.1 (every release), PHP 8.2 < 8.2.35, PHP 8.3 < 8.3.36, PHP 8.4 < 8.4.27, PHP 8.5 < 8.5.12, i.e. every release before the 2026-10-21 security release (GHSA-w8hw-w9fx-j79w / GHSA-6wmf-4rv5-p3rp, CVE-2026-109618 / CVE-2026-109619). On other versions the mitigation is not compiled in and the directive defaults to `0`. Because the callback's data layout is taken from the PHP headers used at build time, the wrapper is also only installed when the *running* PHP version is affected and the session globals match those headers; otherwise `phpinfo()` reports it as `inactive` with the reason. It is not installed when `colopl_bc.security.disable_session_upload_progress=1` has already detached the hook. On a 7.4 / 8.0 / 8.1 build with the [official minimal backport](#official-minimal-backports-for-php-74--80--81) it is installed and reports `active` (the version does not change), but `ext/session` no longer records upload progress on such builds, so it does nothing useful there.
+Affected PHP versions (compiled in and enabled by default): PHP <= 8.1 (every release), PHP 8.2 < 8.2.35, PHP 8.3 < 8.3.36, PHP 8.4 < 8.4.27, PHP 8.5 < 8.5.12, i.e. every release before the 2026-10-21 security release (GHSA-w8hw-w9fx-j79w / GHSA-6wmf-4rv5-p3rp, CVE-2026-109618 / CVE-2026-109619). On other versions the mitigation is not compiled in and the directive defaults to `0`. Because the callback's data layout is taken from the PHP headers used at build time, the wrapper is also only installed when the *running* PHP version is affected and the session globals match those headers; otherwise `phpinfo()` reports it as `inactive` with the reason. It is not installed when `colopl_bc.security.disable_session_upload_progress=1` has already detached the hook. On a build [recognized](#how-this-extension-recognizes-a-backported-build-heuristic) as carrying a [backport of the fix](#unversioned-backports-for-php-56---81) (the version does not change), where `ext/session` no longer records upload progress, it is not installed and `phpinfo()` reports `inactive (backported fix detected in the running PHP)`.
 
 ### `colopl_bc.security.lock_session_serialize_handler` (default: `0`)
 
@@ -282,7 +326,7 @@ The error is not handed to `php_error_cb()` (since 13.5.0): for a memory error t
 - `0`: not applied. A memory error bails out as before.
 - `1`: applied. A memory error ends the worker; php-fpm, Apache (prefork) and CGI-style SAPIs start a new one, the client sees a dropped connection or a 502 instead of a 500.
 
-Enabled by default because a request that hit `memory_limit` has already failed; what changes is only how it fails. What is lost for that request: shutdown functions (including custom out-of-memory error pages), destructors, output buffer callbacks, the session write, output buffers not yet flushed, `error_get_last()` for the error, and the deletion of temporary upload files. In a threaded SAPI (ZTS: Apache worker/event, Windows) the whole process with all its threads ends. If any of this matters more than the memory-safety of unfixed PHP builds, set it to `0`. Applies to every PHP version (5.4+). On a build with the [official minimal backport](#official-minimal-backports-for-php-74--80--81) for 7.4 / 8.0 / 8.1 the engine already ends the process on a memory error before the error callback is reached, so this directive has no effect there (and nothing is logged or displayed; the line goes to stderr).
+Enabled by default because a request that hit `memory_limit` has already failed; what changes is only how it fails. What is lost for that request: shutdown functions (including custom out-of-memory error pages), destructors, output buffer callbacks, the session write, output buffers not yet flushed, `error_get_last()` for the error, and the deletion of temporary upload files. In a threaded SAPI (ZTS: Apache worker/event, Windows) the whole process with all its threads ends. If any of this matters more than the memory-safety of unfixed PHP builds, set it to `0`. Applies to every PHP version (5.4+). On a build with a [backport of the fix](#unversioned-backports-for-php-56---81) the engine already ends the process on a memory error before the error callback is reached (nothing is logged or displayed; the line goes to stderr), so the directive could have no effect there; on a build [recognized](#how-this-extension-recognizes-a-backported-build-heuristic) as such it is not applied and `phpinfo()` reports `inactive (backported fix detected in the running PHP)`.
 
 ### `colopl_bc.security.abort_on_timeout` (default: `1`)
 
@@ -297,7 +341,7 @@ Enabled by default for the same reason as `abort_on_memory_error`: the request h
 
 ### `colopl_bc.security.reset_stale_request_state` (default: `1`)
 
-Clears, at the end of every request, the request-owned state that the next request of the same worker can read before its own initialization resets it, as the 2026-10-21 fix and the official minimal backports do in `php_request_shutdown()`, `shutdown_executor()` and `sapi_deactivate()` (CVE-2026-109619, "stale global state"). The state is released at shutdown but the pointers to it are kept; a diagnostic emitted before `init_executor()` (an invalid or deprecated per-directory INI value under mod_php, a `.user.ini` problem) is handed to the previous request's freed `set_error_handler()` callback, a fatal error there marks the previous request's freed objects as destructed, and a bailout early in request startup makes `php_request_shutdown()` release the previous request's `$_GET` / `$_POST` / ... a second time.
+Clears, at the end of every request, the request-owned state that the next request of the same worker can read before its own initialization resets it, as the 2026-10-21 fix and its backports do in `php_request_shutdown()`, `shutdown_executor()` and `sapi_deactivate()` (CVE-2026-109619, "stale global state"). The state is released at shutdown but the pointers to it are kept; a diagnostic emitted before `init_executor()` (an invalid or deprecated per-directory INI value under mod_php, a `.user.ini` problem) is handed to the previous request's freed `set_error_handler()` callback, a fatal error there marks the previous request's freed objects as destructed, and a bailout early in request startup makes `php_request_shutdown()` release the previous request's `$_GET` / `$_POST` / ... a second time.
 
 An extension cannot run inside those engine functions, but it can run right after them: the module's post-RSHUTDOWN hook (`post_deactivate_func`) is called after the superglobals were released and the executor was shut down, and `sapi_module.deactivate` is called by `sapi_deactivate()` right after it freed the request info strings. From there this mitigation clears:
 
@@ -309,7 +353,16 @@ An extension cannot run inside those engine functions, but it can run right afte
 - `0`: not applied.
 - `1`: applied. Nothing is freed or allocated; only pointers and flags of a finished request are cleared, so a request that completes is not affected in any way.
 
-Enabled by default because it only touches state that is dead at that point. Applies to every PHP version (5.4+). `phpinfo()` reports it as `active (post-RSHUTDOWN hook, sapi deactivate wrapped)`; the SAPI deactivation wrapper chains to the original one. This closes the known pre-initialization readers of stale state; state this extension does not know about, and the diagnostics themselves, are not covered.
+Enabled by default because it only touches state that is dead at that point. Applies to every PHP version (5.4+), except on a build [recognized](#how-this-extension-recognizes-a-backported-build-heuristic) as carrying a [backport of the fix](#unversioned-backports-for-php-56---81), which clears the same state itself: there it is not applied and `phpinfo()` reports `inactive (backported fix detected in the running PHP)`. Otherwise `phpinfo()` reports it as `active (post-RSHUTDOWN hook, sapi deactivate wrapped)`; the SAPI deactivation wrapper chains to the original one. This closes the known pre-initialization readers of stale state; state this extension does not know about, and the diagnostics themselves, are not covered.
+
+### `colopl_bc.security.detect_backported_fix` (default: `1`)
+
+Checks at startup whether the running PHP carries an unversioned backport of the 2026-10-21 fix (the official minimal backports for 7.4 / 8.0 / 8.1 and the vendor packages built from them, deb.sury.org's ports down to 5.6 included; see [Unversioned backports](#unversioned-backports-for-php-56---81)), by looking for the exported function `zend_mm_safe_error_ex()` that every one of them whose source could be inspected adds. On such a build `abort_on_memory_error`, `harden_session_upload_progress` and `reset_stale_request_state` are not applied, because the backport already does what they do.
+
+- `0`: the check is skipped; the stopgaps are applied as on any unfixed build. `phpinfo()` reports `not checked (disabled by INI)`.
+- `1`: the check is made. `phpinfo()` reports `detected (zend_mm_safe_error_ex exported)` or `not detected`.
+
+**The check is a heuristic** (see the warning in [How this extension recognizes a backported build](#how-this-extension-recognizes-a-backported-build-heuristic)): it trusts one symbol, not the behaviour, and it can take a build that has the symbol without the rest of the fix for a fixed one. Set it to `0` when you do not trust the PHP build or want the stopgaps regardless. Applies to every PHP version (5.4+); on Windows the PHP DLL is checked. The fixed releases (8.2.35+) do not have the symbol, so this directive changes nothing there.
 
 ## API references
 

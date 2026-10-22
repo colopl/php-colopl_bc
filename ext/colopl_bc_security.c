@@ -54,6 +54,82 @@
 #endif
 
 /*
+ * PHP builds that carry the 2026-10-21 fix as an unversioned backport
+ *
+ * For the end-of-life branches the PHP security team published minimal
+ * backports of the fix (php-src branches PHP-7.4-CVE-2026-109618-109619,
+ * PHP-8.0-..., PHP-8.1-..., "Avoid state corruption via bailout - Minimal
+ * mitigation for EOL version"), and vendors ship them, deb.sury.org down to
+ * PHP 5.6, without changing PHP_VERSION_ID. Such a build already ends the
+ * process on a memory error before zend_error_cb is reached, turns the
+ * session.upload_progress handler into a no-op and clears the stale request
+ * state at shutdown, so abort_on_memory_error, harden_session_upload_progress
+ * and reset_stale_request_state have nothing left to do there and are not
+ * applied.
+ *
+ * Every one of these backports whose source could be inspected adds the
+ * exported function zend_mm_safe_error_ex() (Zend/zend_alloc.c), which no PHP
+ * release has, so its presence in the running PHP is taken as the sign of the
+ * backport. This is a
+ * heuristic: a build that exports the symbol without the rest of the fix, or a
+ * backport that does not add it (or a PHP that does not export its symbols),
+ * is misjudged. colopl_bc.security.detect_backported_fix=0 skips the check and
+ * applies the stopgaps as on any unfixed build.
+ */
+
+static int colopl_bc_security_dbf_requested = 1;	/* INI value */
+static int colopl_bc_security_dbf_detected = 0;		/* zend_mm_safe_error_ex() found */
+
+int colopl_bc_security_backported_fix_is_detected(void)
+{
+	return colopl_bc_security_dbf_detected;
+}
+
+static int colopl_bc_security_php_has_backported_fix(void)
+{
+#if defined(PHP_WIN32)
+	HMODULE php = NULL;
+
+	/* The module that holds zend_error_cb is the PHP DLL (php8ts.dll, php7.dll, ...). */
+	if (!GetModuleHandleExA(GET_MODULE_HANDLE_EX_FLAG_FROM_ADDRESS | GET_MODULE_HANDLE_EX_FLAG_UNCHANGED_REFCOUNT,
+			(LPCSTR) &zend_error_cb, &php)) {
+		return 0;
+	}
+	return DL_FETCH_SYMBOL(php, "zend_mm_safe_error_ex") != NULL;
+#elif defined(HAVE_LIBDL)
+	void *symbol;
+# ifdef RTLD_DEFAULT
+	symbol = DL_FETCH_SYMBOL(RTLD_DEFAULT, "zend_mm_safe_error_ex");
+# else
+	/* The main program, what it was linked with, and what was loaded RTLD_GLOBAL
+	 * (where the symbols this extension itself resolves against come from). */
+	void *self = dlopen(NULL, RTLD_LAZY);
+
+	if (!self) {
+		return 0;
+	}
+	symbol = DL_FETCH_SYMBOL(self, "zend_mm_safe_error_ex");
+	dlclose(self);
+# endif
+	return symbol != NULL;
+#else
+	return 0;
+#endif
+}
+
+static const char *colopl_bc_security_backported_fix_state(void)
+{
+	if (!colopl_bc_security_dbf_requested) {
+		return "not checked (disabled by INI)";
+	}
+	return colopl_bc_security_dbf_detected
+		? "detected (zend_mm_safe_error_ex exported)"
+		: "not detected";
+}
+
+#define COLOPL_BC_SECURITY_BACKPORTED_FIX_INACTIVE "inactive (backported fix detected in the running PHP)"
+
+/*
  * Security backport: session.upload_progress
  *
  * ext/session installs itself into the multipart/form-data parser through the
@@ -760,9 +836,15 @@ static int colopl_bc_security_aome_applied = 0;		/* zend_error_cb replaced by us
 static int colopl_bc_security_abort_in_progress = 0;	/* the process is being ended */
 static colopl_bc_security_error_cb_t colopl_bc_security_aome_orig = NULL;
 
+/* A backported build ends the process on a memory error before the callback is reached. */
+static int colopl_bc_security_aome_wanted(void)
+{
+	return colopl_bc_security_aome_requested && !colopl_bc_security_dbf_detected;
+}
+
 int colopl_bc_security_abort_on_memory_error_is_active(void)
 {
-	return colopl_bc_security_aome_applied && colopl_bc_security_aome_requested;
+	return colopl_bc_security_aome_applied && colopl_bc_security_aome_wanted();
 }
 
 int colopl_bc_security_abort_on_timeout_is_active(void)
@@ -814,7 +896,7 @@ static int colopl_bc_security_is_abort_error(int type, const char *message)
 	if (colopl_bc_security_error_type(type) != E_ERROR || !message) {
 		return 0;
 	}
-	if (colopl_bc_security_aome_requested) {
+	if (colopl_bc_security_aome_wanted()) {
 		for (prefix = colopl_bc_security_memory_error_prefixes; *prefix; prefix++) {
 			if (strncmp(message, *prefix, strlen(*prefix)) == 0) {
 				return 1;
@@ -908,7 +990,7 @@ static void colopl_bc_security_error_cb(int type, const char *error_filename, co
 
 static void colopl_bc_security_abort_on_memory_error_apply(void)
 {
-	if ((!colopl_bc_security_aome_requested && !colopl_bc_security_aot_requested) || colopl_bc_security_aome_applied) {
+	if ((!colopl_bc_security_aome_wanted() && !colopl_bc_security_aot_requested) || colopl_bc_security_aome_applied) {
 		return;
 	}
 	colopl_bc_security_aome_orig = zend_error_cb;
@@ -995,7 +1077,8 @@ static int colopl_bc_security_rsrs_sapi_deactivate(TSRMLS_D)
 		SG(request_info).auth_digest = NULL;
 		SG(request_info).content_type_dup = NULL;
 		SG(request_info).current_user = NULL;
-#if PHP_VERSION_ID < 70000
+#if PHP_VERSION_ID < 50600
+		/* Replaced by the request_body stream in PHP 5.6. */
 		SG(request_info).post_data = NULL;
 		SG(request_info).raw_post_data = NULL;
 #endif
@@ -1008,7 +1091,7 @@ int colopl_bc_security_post_deactivate(void)
 	int i;
 	TSRMLS_FETCH();
 
-	if (!colopl_bc_security_rsrs_requested) {
+	if (!colopl_bc_security_rsrs_applied) {
 		return SUCCESS;
 	}
 
@@ -1060,7 +1143,8 @@ int colopl_bc_security_post_deactivate(void)
 
 static void colopl_bc_security_stale_request_state_reset_apply(void)
 {
-	if (!colopl_bc_security_rsrs_requested || colopl_bc_security_rsrs_applied) {
+	/* The backport clears the same state in php_request_shutdown() and sapi_deactivate(). */
+	if (!colopl_bc_security_rsrs_requested || colopl_bc_security_dbf_detected || colopl_bc_security_rsrs_applied) {
 		return;
 	}
 	colopl_bc_security_rsrs_orig_deactivate = sapi_module.deactivate;
@@ -1087,6 +1171,9 @@ static const char *colopl_bc_security_stale_request_state_reset_state(void)
 			? "active (post-RSHUTDOWN hook, sapi deactivate wrapped)"
 			: "active (post-RSHUTDOWN hook, sapi deactivate wrapped, another extension chained after it)";
 	}
+	if (colopl_bc_security_rsrs_requested && colopl_bc_security_dbf_detected) {
+		return COLOPL_BC_SECURITY_BACKPORTED_FIX_INACTIVE;
+	}
 	return "inactive (disabled by INI)";
 }
 
@@ -1098,6 +1185,7 @@ PHP_INI_BEGIN()
 	PHP_INI_ENTRY(COLOPL_BC_SECURITY_INI_ABORT_ON_MEMORY_ERROR, "1", PHP_INI_SYSTEM, NULL)
 	PHP_INI_ENTRY(COLOPL_BC_SECURITY_INI_ABORT_ON_TIMEOUT, "1", PHP_INI_SYSTEM, NULL)
 	PHP_INI_ENTRY(COLOPL_BC_SECURITY_INI_RESET_STALE_REQUEST_STATE, "1", PHP_INI_SYSTEM, NULL)
+	PHP_INI_ENTRY(COLOPL_BC_SECURITY_INI_DETECT_BACKPORTED_FIX, "1", PHP_INI_SYSTEM, NULL)
 PHP_INI_END()
 
 int colopl_bc_security_session_upload_progress_is_hardened(void)
@@ -1141,6 +1229,11 @@ static void colopl_bc_security_session_upload_progress_harden(TSRMLS_D)
 	version_id = colopl_bc_security_runtime_version_id(TSRMLS_C);
 	if (version_id <= 0 || !COLOPL_BC_SECURITY_SESSION_UPLOAD_PROGRESS_POINTERS_AFFECTED(version_id)) {
 		colopl_bc_security_suph_state = "inactive (not applicable to the running PHP version)";
+		return;
+	}
+	/* The backport turns ext/session's upload progress handler into a no-op. */
+	if (colopl_bc_security_dbf_detected) {
+		colopl_bc_security_suph_state = COLOPL_BC_SECURITY_BACKPORTED_FIX_INACTIVE;
 		return;
 	}
 
@@ -1232,6 +1325,10 @@ int colopl_bc_security_minit(INIT_FUNC_ARGS)
 {
 	REGISTER_INI_ENTRIES();
 
+	/* Before the stopgaps that a backported build does not need. */
+	colopl_bc_security_dbf_requested = INI_BOOL(COLOPL_BC_SECURITY_INI_DETECT_BACKPORTED_FIX) ? 1 : 0;
+	colopl_bc_security_dbf_detected = colopl_bc_security_dbf_requested ? colopl_bc_security_php_has_backported_fix() : 0;
+
 	colopl_bc_security_sup_requested = INI_BOOL(COLOPL_BC_SECURITY_INI_DISABLE_SESSION_UPLOAD_PROGRESS) ? 1 : 0;
 	colopl_bc_security_session_upload_progress_apply();
 
@@ -1263,6 +1360,7 @@ int colopl_bc_security_mshutdown(SHUTDOWN_FUNC_ARGS)
 	colopl_bc_security_session_serialize_handler_unlock(TSRMLS_C);
 	colopl_bc_security_session_upload_progress_unharden();
 	colopl_bc_security_session_upload_progress_reset();
+	colopl_bc_security_dbf_detected = 0;
 
 	UNREGISTER_INI_ENTRIES();
 
@@ -1287,6 +1385,8 @@ void colopl_bc_security_minfo(ZEND_MODULE_INFO_FUNC_ARGS)
 
 	php_info_print_table_start();
 	php_info_print_table_header(2, "colopl_bc security backports", "enabled");
+	php_info_print_table_row(2, "2026-10-21 fix backported into PHP (heuristic)", colopl_bc_security_backported_fix_state());
+	php_info_print_table_row(2, COLOPL_BC_SECURITY_INI_DETECT_BACKPORTED_FIX, colopl_bc_security_dbf_requested ? "1" : "0");
 	php_info_print_table_row(2, "session.upload_progress hook mitigation", state);
 	php_info_print_table_row(2, COLOPL_BC_SECURITY_INI_DISABLE_SESSION_UPLOAD_PROGRESS, colopl_bc_security_sup_requested ? "1" : "0");
 	php_info_print_table_row(2, "session.upload_progress pointer hardening", colopl_bc_security_suph_state);
@@ -1296,7 +1396,9 @@ void colopl_bc_security_minfo(ZEND_MODULE_INFO_FUNC_ARGS)
 	php_info_print_table_row(2, COLOPL_BC_SECURITY_INI_LOCK_SESSION_SERIALIZE_HANDLER, colopl_bc_security_ssh_requested ? "1" : "0");
 	php_info_print_table_row(2, "unserialize() nested-state isolation", colopl_bc_security_unserialize_state());
 	php_info_print_table_row(2, COLOPL_BC_SECURITY_INI_ISOLATE_UNSERIALIZE, colopl_bc_security_unser_requested ? "1" : "0");
-	php_info_print_table_row(2, "memory error process abort", colopl_bc_security_abort_state(colopl_bc_security_aome_requested));
+	php_info_print_table_row(2, "memory error process abort", colopl_bc_security_aome_requested && colopl_bc_security_dbf_detected
+		? COLOPL_BC_SECURITY_BACKPORTED_FIX_INACTIVE
+		: colopl_bc_security_abort_state(colopl_bc_security_aome_requested));
 	php_info_print_table_row(2, COLOPL_BC_SECURITY_INI_ABORT_ON_MEMORY_ERROR, colopl_bc_security_aome_requested ? "1" : "0");
 	php_info_print_table_row(2, "execution timeout process abort", colopl_bc_security_abort_state(colopl_bc_security_aot_requested));
 	php_info_print_table_row(2, COLOPL_BC_SECURITY_INI_ABORT_ON_TIMEOUT, colopl_bc_security_aot_requested ? "1" : "0");

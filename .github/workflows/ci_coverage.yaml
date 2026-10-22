@@ -18,7 +18,7 @@ on:
         type: string
 jobs:
   init:
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
     env:
       PSKEL_BUILD_TARGET: base
     outputs:
@@ -103,7 +103,7 @@ jobs:
     needs:
       - init
       - coverage
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
     env:
       PSKEL_BUILD_TARGET: base
     if: github.ref == 'refs/heads/main'

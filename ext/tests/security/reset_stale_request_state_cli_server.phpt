@@ -6,6 +6,9 @@ colopl_bc
 <?php
 if (!extension_loaded('colopl_bc')) die('skip colopl_bc extension is not loaded');
 if (php_sapi_name() !== 'cli') die('skip needs the CLI binary (php -S)');
+// On Windows proc_terminate() only ends the cmd.exe wrapper; the orphaned server keeps
+// the test's inherited stdout open and run-tests.php waits for it forever.
+if (substr(PHP_OS, 0, 3) === 'WIN') die('skip Windows not supported');
 if (!function_exists('proc_open') || !function_exists('stream_socket_server')) die('skip proc_open / sockets not available');
 if (!ini_get('allow_url_fopen')) die('skip allow_url_fopen=0');
 ?>

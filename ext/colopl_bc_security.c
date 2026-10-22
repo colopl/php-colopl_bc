@@ -995,7 +995,8 @@ static int colopl_bc_security_rsrs_sapi_deactivate(TSRMLS_D)
 		SG(request_info).auth_digest = NULL;
 		SG(request_info).content_type_dup = NULL;
 		SG(request_info).current_user = NULL;
-#if PHP_VERSION_ID < 70000
+#if PHP_VERSION_ID < 50600
+		/* Replaced by the request_body stream in PHP 5.6. */
 		SG(request_info).post_data = NULL;
 		SG(request_info).raw_post_data = NULL;
 #endif

@@ -54,7 +54,7 @@ RUN docker-php-source extract \
 
 ARG SKIP_VALGRIND
 # renovate: datasource=custom.valgrind depName=valgrind
-ARG VALGRIND_VERSION=3.27.1
+ARG VALGRIND_VERSION=3.28.0
 RUN --mount=type=bind,source=.,target=/build_context \
     if test "${SKIP_VALGRIND}" = "1"; then \
       echo "[Pskel] Skipping Valgrind build (SKIP_VALGRIND=1)." >&2; \

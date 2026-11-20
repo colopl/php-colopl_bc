@@ -1,6 +1,6 @@
 ARG PLATFORM=${BUILDPLATFORM:-linux/amd64}
 ARG IMAGE=php
-ARG TAG=8.5-cli
+ARG TAG=8.6-cli
 ARG SKIP_VALGRIND=0
 ARG ENABLE_CLANG=1
 # renovate: datasource=github-releases depName=llvm/llvm-project
